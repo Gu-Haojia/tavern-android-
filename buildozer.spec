@@ -39,3 +39,7 @@ android.archs = arm64-v8a
 android.accept_sdk_license = True
 # 打包为 debug 版（无需签名配置，适合自用）
 android.debug_artifact_name = tavernpet-debug
+[p4a]
+# 固定 Python 版本到 3.12（3.14 太新，很多 wheel 还没出）
+bootstrap = sd12
+requirements = python3.12,kivy

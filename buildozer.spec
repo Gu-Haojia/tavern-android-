@@ -2,6 +2,7 @@
 
 # 应用名（手机桌面显示的名字）
 title = 酒馆
+version = 0.1.0
 
 # 包名（唯一标识，装过就不能随便改）
 package.name = tavernpet

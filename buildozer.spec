@@ -14,7 +14,7 @@ source.include_exts = py,png,jpg,kv,atlas,ttf,txt,json
 source.exclude_dirs = tests, bin, .git, .github
 
 # 依赖：ai_core 只用 Python 标准库，Kivy 提供 UI
-requirements = python3,kivy
+requirements = python3.12,kivy,distro,charset_normalizer>=3.0,<3.5
 
 # 竖屏（手机聊天应用）
 orientation = portrait

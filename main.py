@@ -212,9 +212,15 @@ class ModernTextInput(TextInput):
         kwargs.setdefault('hint_text_color', MUTED)
         kwargs.setdefault('selection_color', (0.18, 0.43, 1.0, 0.25))
         kwargs.setdefault('background_color', CARD)
+        # Kivy 2.3.1 defaults to input_type='null', which disables Android
+        # IME composition. Explicit text mode is required for Chinese input.
+        kwargs.setdefault('input_type', 'text')
         super().__init__(**kwargs)
         self.background_normal = ''
         self.background_active = ''
+        self.background_disabled_normal = ''
+        self.background_disabled_down = ''
+        self.disabled_foreground_color = TEXT_DARK
 
 
 class BubbleButton(ModernButton):
@@ -402,7 +408,9 @@ class ChatScreen(Screen):
 
     def set_input_enabled(self, enabled):
         self.input.disabled = not enabled
-        self.input.opacity = 1.0 if enabled else 0.5
+        # Keep the composer surface white while a request is running. The
+        # disabled state still blocks duplicate input without leaving a gray box.
+        self.input.opacity = 1.0
 
     def _run(self, text, append_user=True):
         try:

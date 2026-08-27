@@ -14,10 +14,10 @@ source.exclude_dirs = tests,bin,.git,.github,.buildozer,venv,.venv
 # ai_core.py 只使用标准库；Kivy 是唯一的 UI 框架依赖。
 # distro 和 charset_normalizer 是运行时普通 Python 包，需显式列出。
 # Python 版本必须 python3 和 hostpython3 一起钉，两者必须完全一致（p4a 强制检查）。
-# 用 3.12（p4a master 官方稳定支持到 3.12），配 NDK 29（官方验证组合）：
-#   - 3.14.2 是 p4a 默认，但其 hostpython3 3.14 的 ensurepip 在旧 buildozer 下报 BuildDependencyInstallError，不可用；
-#   - 3.12 在 NDK 29 下 grpmodule 可编译（NDK 25 的 bionic 不声明 setgrent 才会挂，升 NDK 到 29 解决）。
-requirements = python3==3.12,hostpython3==3.12,kivy,distro,charset_normalizer
+# 用 3.12.14（p4a master 官方稳定支持到 3.12；3.14 是默认但 hostpython3 3.14 的 ensurepip 在旧组合下报 BuildDependencyInstallError，不可用）。
+# 必须写完整小版本号（3.12.14，不能只写 3.12）：p4a 拼下载地址 v{version}.tar.gz，只写 3.12 会 404 找不到 tag。
+# 配 NDK 28c（p4a 官方推荐版本；NDK 25 的 bionic 不声明 setgrent 导致 grpmodule 编译失败，升到 28c 解决）。
+requirements = python3==3.12.14,hostpython3==3.12.14,kivy,distro,charset_normalizer
 
 # Kivy 应用使用 SDL2。合法的 p4a bootstrap 只有 sdl2 / service_only / webview / qt 等；bootstrap 名不控制 Python 版本。
 p4a.bootstrap = sdl2
@@ -33,7 +33,7 @@ android.permissions = INTERNET
 # GitHub Actions 当前使用的 Android 工具链版本。
 android.api = 34
 android.minapi = 24
-android.ndk = 29
+android.ndk = 28c
 android.archs = arm64-v8a
 android.accept_sdk_license = True
 

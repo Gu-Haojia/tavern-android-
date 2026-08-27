@@ -373,14 +373,16 @@ def _bubble(text, is_user):
         markup=_EMOJI_MARKUP_AVAILABLE,
         # Keep the reading column narrower than the screen so this is a chat
         # bubble, not another full-width content card.
-        size_hint_x=0.78 if is_user else 0.86,
+        size_hint_x=0.74 if is_user else 0.84,
         size_hint_y=None,
         # NumericProperty 不接受 None；先给气泡一个最小高度，随后按文本高度调整。
         height=dp(44),
         halign='left',
         valign='middle',
         text_size=(None, None),
-        background_color=USER_BG if is_user else CARD,
+        # AI replies read like a story column; only the user's own text gets a
+        # filled bubble. This prevents a long reply becoming a giant white card.
+        background_color=USER_BG if is_user else (0, 0, 0, 0),
         color=TEXT_WHITE if is_user else TEXT_DARK,
         padding=(dp(15), dp(10)),
         font_size=sp(15),
@@ -424,7 +426,7 @@ class ChatScreen(Screen):
         # overlays, leaving the conversation with the whole viewport.
         root = FloatLayout()
 
-        self.scroll = ScrollView(size_hint=(1, 1), pos_hint={'x': 0, 'y': 0},
+        self.scroll = ScrollView(size_hint=(1, 0.88), pos_hint={'x': 0, 'y': 0},
                                  bar_width=dp(3), bar_color=PRIMARY,
                                  bar_inactive_color=DIVIDER,
                                  scroll_type=['bars', 'content'])
@@ -505,7 +507,6 @@ class ChatScreen(Screen):
         heading.add_widget(self.title_lbl)
         heading.add_widget(self.subtitle_lbl)
         top.add_widget(heading)
-        top.add_widget(Widget())
         self.tavern_btn = ModernButton(
             text='小说模式', size_hint_x=None, width=dp(82), height=dp(34),
             background_color=PRIMARY_SOFT, color=PRIMARY_DARK, font_size=sp(11),

@@ -425,12 +425,15 @@ class ChatScreen(Screen):
         root = FloatLayout()
 
         self.scroll = ScrollView(size_hint=(1, 1), pos_hint={'x': 0, 'y': 0},
-                                 padding=(dp(16), dp(82), dp(16), dp(78)),
                                  bar_width=dp(3), bar_color=PRIMARY,
                                  bar_inactive_color=DIVIDER,
                                  scroll_type=['bars', 'content'])
         self.msg_box = BoxLayout(orientation='vertical', size_hint_y=None,
-                                 spacing=dp(5), padding=(0, dp(10)))
+                                 spacing=dp(5),
+                                 # ScrollView itself has no padding property in
+                                 # Kivy 2.3; keep the overlay clearance on the
+                                 # viewport child instead.
+                                 padding=(dp(16), dp(82), dp(16), dp(78)))
         self.msg_box.bind(minimum_height=self.msg_box.setter('height'))
         self.scroll.add_widget(self.msg_box)
         root.add_widget(self.scroll)

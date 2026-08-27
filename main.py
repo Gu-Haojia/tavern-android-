@@ -204,9 +204,7 @@ class ModernButton(Button):
 
 
 class ModernTextInput(TextInput):
-    """Clean rounded text field with the same predictable Android fallback font."""
-
-    fill_color = ListProperty(CARD)
+    """Stable text field: keep Kivy's native text layer visible on Android."""
 
     def __init__(self, **kwargs):
         # 统一保证所有页面的输入文字都与浅色输入底有足够对比度。
@@ -215,23 +213,8 @@ class ModernTextInput(TextInput):
         kwargs.setdefault('selection_color', (0.18, 0.43, 1.0, 0.25))
         kwargs.setdefault('background_color', CARD)
         super().__init__(**kwargs)
-        self.fill_color = list(self.background_color)
-        self.background_color = (0, 0, 0, 0)
         self.background_normal = ''
         self.background_active = ''
-        with self.canvas.before:
-            self._input_color = Color(rgba=self.fill_color)
-            self._input_rect = RoundedRectangle(
-                pos=self.pos, size=self.size,
-                radius=[(dp(10), dp(10))] * 4)
-        self.bind(pos=self._sync_input, size=self._sync_input,
-                  fill_color=self._sync_input)
-        self._sync_input()
-
-    def _sync_input(self, *_):
-        self._input_color.rgba = self.fill_color
-        self._input_rect.pos = self.pos
-        self._input_rect.size = self.size
 
 
 class BubbleButton(ModernButton):

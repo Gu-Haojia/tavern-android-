@@ -20,9 +20,9 @@ source.exclude_dirs = tests, bin, .git, .github, .buildozer
 # pure-Python 包安装阶段，容易受目标 Python 内置 pip 版本影响。
 requirements = python3,kivy
 
-# 使用已发布的 p4a v2026.05.09，避免分支后续漂移。
-p4a.branch = master
-p4a.commit = 58d21141f17c889bf8585f5665921d72028f8831
+# 固定到包含 Android wheel 安装修复的 p4a develop 提交，避免分支后续漂移。
+p4a.branch = develop
+p4a.commit = 9d5918bf752379f4520902524c15f794e45972b4
 
 # Kivy Android 图形应用使用 SDL2 bootstrap。
 p4a.bootstrap = sdl2

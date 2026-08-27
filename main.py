@@ -25,7 +25,9 @@ from kivy.uix.gridlayout import GridLayout
 from kivy.uix.spinner import Spinner
 from kivy.uix.checkbox import CheckBox
 from kivy.uix.anchorlayout import AnchorLayout
+from kivy.uix.floatlayout import FloatLayout
 from kivy.clock import Clock
+from kivy.animation import Animation
 from kivy.metrics import dp, sp
 from kivy.graphics import Color, Line, RoundedRectangle
 from kivy.properties import ListProperty
@@ -307,6 +309,38 @@ class ModernTextInput(TextInput):
         self.padding = list(self.padding or [dp(12), dp(10)])
 
 
+class AvatarBadge(Label):
+    """Small circular identity badge used by the chat and page chrome."""
+
+    fill_color = ListProperty(PRIMARY)
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault('size_hint', (None, None))
+        kwargs.setdefault('size', (dp(32), dp(32)))
+        kwargs.setdefault('font_name', _UI_FONT_NAME)
+        kwargs.setdefault('font_size', sp(12))
+        kwargs.setdefault('bold', True)
+        kwargs.setdefault('color', TEXT_WHITE)
+        kwargs.setdefault('halign', 'center')
+        kwargs.setdefault('valign', 'middle')
+        super().__init__(**kwargs)
+        self.text_size = self.size
+        with self.canvas.before:
+            self._avatar_color = Color(rgba=self.fill_color)
+            self._avatar = RoundedRectangle(pos=self.pos, size=self.size,
+                                            radius=[(dp(16), dp(16))] * 4)
+        self.bind(pos=self._sync_avatar, size=self._sync_avatar,
+                  fill_color=self._sync_avatar)
+
+    def _sync_avatar(self, *_):
+        self.text_size = self.size
+        self._avatar_color.rgba = self.fill_color
+        self._avatar.pos = self.pos
+        self._avatar.size = self.size
+        self._avatar.radius = [(min(self.width, self.height) / 2,
+                                min(self.width, self.height) / 2)] * 4
+
+
 class BubbleButton(ModernButton):
     """聊天气泡：长按（≥0.5s）触发菜单。不 disabled（disabled 会吞掉触摸事件）。"""
 
@@ -337,18 +371,20 @@ def _bubble(text, is_user):
     btn = BubbleButton(
         text=_emoji_markup(raw_text),
         markup=_EMOJI_MARKUP_AVAILABLE,
-        size_hint_x=0.92,
+        # Keep the reading column narrower than the screen so this is a chat
+        # bubble, not another full-width content card.
+        size_hint_x=0.78 if is_user else 0.86,
         size_hint_y=None,
         # NumericProperty 不接受 None；先给气泡一个最小高度，随后按文本高度调整。
         height=dp(44),
         halign='left',
         valign='middle',
         text_size=(None, None),
-        background_color=USER_BG if is_user else AI_BG,
+        background_color=USER_BG if is_user else CARD,
         color=TEXT_WHITE if is_user else TEXT_DARK,
-        padding=(dp(16), dp(12)),
+        padding=(dp(15), dp(10)),
         font_size=sp(15),
-        line_height=1.15,
+        line_height=1.2,
     )
 
     def update_bubble_width(widget, _):
@@ -384,89 +420,108 @@ class ChatScreen(Screen):
 
     # ---------- UI ----------
     def build_ui(self):
-        root = BoxLayout(orientation='vertical', padding=(dp(12), dp(10)), spacing=dp(10))
+        # Full-bleed reading surface. The toolbar, option tray and composer are
+        # overlays, leaving the conversation with the whole viewport.
+        root = FloatLayout()
 
-        # 顶部栏：标题、状态、模式和常用操作。
-        top = SurfaceBox(size_hint_y=None, height=dp(70), padding=(dp(14), dp(10)),
-                         spacing=dp(8), surface_color=CARD, border_color=DIVIDER)
-        heading = BoxLayout(orientation='vertical', spacing=dp(1))
-        self.title_lbl = _label(_emoji_markup('🍻 酒馆'), markup=_EMOJI_MARKUP_AVAILABLE,
-                                bold=True, font_size=sp(19), size_hint_y=None, height=dp(31))
-        self.subtitle_lbl = _label('准备好继续你的故事', color=MUTED, font_size=sp(11),
-                                   size_hint_y=None, height=dp(20))
-        heading.add_widget(self.title_lbl)
-        heading.add_widget(self.subtitle_lbl)
-        top.add_widget(heading)
-        self.tavern_btn = ModernButton(
-            text=_emoji_markup('📖 小说关'), markup=_EMOJI_MARKUP_AVAILABLE,
-            size_hint_x=None, width=dp(96), background_color=PRIMARY_SOFT,
-            color=PRIMARY_DARK, font_size=sp(12))
-        self.tavern_btn.bind(on_release=lambda *_: self.toggle_tavern())
-        top.add_widget(self.tavern_btn)
-        regen_btn = ModernButton(text='重试',
-                                 size_hint_x=None, width=dp(42),
-                                 background_color=FIELD_BG, color=TEXT_DARK,
-                                 font_size=sp(12))
-        regen_btn.bind(on_release=lambda *_: self.regen())
-        top.add_widget(regen_btn)
-        new_btn = ModernButton(text='＋', size_hint_x=None, width=dp(42),
-                               background_color=FIELD_BG, color=TEXT_DARK,
-                               font_size=sp(20))
-        new_btn.bind(on_release=lambda *_: self.new_chat())
-        top.add_widget(new_btn)
-        root.add_widget(top)
-
-        # 消息滚动区
-        self.scroll = ScrollView(bar_width=dp(3), bar_color=PRIMARY,
+        self.scroll = ScrollView(size_hint=(1, 1), pos_hint={'x': 0, 'y': 0},
+                                 padding=(dp(16), dp(82), dp(16), dp(78)),
+                                 bar_width=dp(3), bar_color=PRIMARY,
                                  bar_inactive_color=DIVIDER,
                                  scroll_type=['bars', 'content'])
         self.msg_box = BoxLayout(orientation='vertical', size_hint_y=None,
-                                 spacing=dp(12), padding=(dp(2), dp(10)))
+                                 spacing=dp(5), padding=(0, dp(10)))
         self.msg_box.bind(minimum_height=self.msg_box.setter('height'))
         self.scroll.add_widget(self.msg_box)
         root.add_widget(self.scroll)
 
-        self.empty_state = SurfaceBox(orientation='vertical', size_hint_y=None,
-                                      height=dp(170), padding=(dp(20), dp(18)),
-                                      spacing=dp(5), surface_color=CARD,
-                                      border_color=DIVIDER)
+        # Compact welcome state; it is removed entirely once a message exists.
+        self.empty_state = BoxLayout(orientation='vertical', size_hint_y=None,
+                                     height=dp(158), padding=(dp(10), dp(12)),
+                                     spacing=dp(5))
+        welcome_avatar = AvatarBadge(text='酒', size=(dp(42), dp(42)),
+                                     fill_color=PRIMARY)
+        avatar_holder = AnchorLayout(size_hint_y=None, height=dp(42))
+        avatar_holder.add_widget(welcome_avatar)
+        self.empty_state.add_widget(avatar_holder)
         self.empty_state.add_widget(_label(_emoji_markup('✨ 开始一段新的故事'),
                                            markup=_EMOJI_MARKUP_AVAILABLE,
                                            bold=True, font_size=sp(17),
                                            size_hint_y=None, height=dp(32),
                                            halign='center'))
-        self.empty_state.add_widget(_label('发送一句话，或者打开小说模式开始互动。\n你的对话会自动保存在本机。',
+        self.empty_state.add_widget(_label('发送一句话，或开启小说模式开始互动。\n对话会自动保存在本机。',
                                            color=MUTED, font_size=sp(12),
                                            halign='center', valign='top',
                                            size_hint_y=None, height=dp(48)))
 
-        # 小说选项区（动态，隐藏）。
+        # This tray is collapsed and transparent until real choices exist.
         self.choices_panel = SurfaceBox(orientation='vertical', size_hint_y=None,
-                                        height=0, padding=(dp(10), dp(8)),
+                                        size_hint_x=0.92, height=0,
+                                        pos_hint={'x': 0.04, 'y': 0.105},
+                                        opacity=0, padding=(dp(12), dp(8)),
                                         spacing=dp(5), surface_color=CARD,
-                                        border_color=DIVIDER)
+                                        border_color=(0, 0, 0, 0),
+                                        surface_radius=[dp(18)] * 4)
         self.choices_box = BoxLayout(orientation='vertical', size_hint_y=None,
                                      spacing=dp(6))
         self.choices_box.bind(minimum_height=self.choices_box.setter('height'))
         self.choices_panel.add_widget(self.choices_box)
         root.add_widget(self.choices_panel)
 
-        # 输入区：保持原生 TextInput，避免 Android 输入法组合文字丢失。
-        bottom = SurfaceBox(size_hint_y=None, height=dp(72), padding=(dp(8), dp(8)),
-                            spacing=dp(8), surface_color=CARD, border_color=DIVIDER)
+        # Floating composer, visually separated from the message stream.
+        bottom = SurfaceBox(size_hint=(0.92, None), height=dp(58),
+                            pos_hint={'x': 0.04, 'y': 0.015},
+                            padding=(dp(6), dp(6)), spacing=dp(8),
+                            surface_color=CARD, border_color=(0, 0, 0, 0),
+                            surface_radius=[dp(20)] * 4)
         self.input = ModernTextInput(hint_text='说点什么…', multiline=False,
-                               size_hint_x=0.78, background_color=FIELD_BG,
+                               size_hint_x=1, background_color=FIELD_BG,
                                background_normal='', background_active='',
                                hint_text_color=MUTED, foreground_color=TEXT_DARK,
-                               padding=(dp(14), dp(11)))
+                               padding=(dp(14), dp(9)))
         self.input.bind(on_text_validate=lambda *_: self.send())
         bottom.add_widget(self.input)
         self.send_btn = ModernButton(text='发送',
-                                     size_hint_x=0.22, background_color=PRIMARY,
-                                     color=TEXT_WHITE, font_size=sp(13))
+                                     size_hint_x=None, width=dp(68),
+                                     background_color=PRIMARY, color=TEXT_WHITE,
+                                     font_size=sp(13), button_radius=[dp(16)] * 4)
         self.send_btn.bind(on_release=lambda *_: self.send())
         bottom.add_widget(self.send_btn)
         root.add_widget(bottom)
+
+        # Lightweight top app bar; no more giant rounded header card.
+        top = BoxLayout(orientation='horizontal', size_hint=(1, None), height=dp(70),
+                        pos_hint={'x': 0, 'top': 1}, padding=(dp(18), dp(11)),
+                        spacing=dp(9))
+        top.add_widget(AvatarBadge(text='酒', fill_color=PRIMARY))
+        heading = BoxLayout(orientation='vertical', spacing=dp(0))
+        self.title_lbl = _label('酒馆', bold=True, font_size=sp(18),
+                                size_hint_y=None, height=dp(28))
+        self.subtitle_lbl = _label('准备好继续你的故事', color=MUTED, font_size=sp(11),
+                                   size_hint_y=None, height=dp(19))
+        heading.add_widget(self.title_lbl)
+        heading.add_widget(self.subtitle_lbl)
+        top.add_widget(heading)
+        top.add_widget(Widget())
+        self.tavern_btn = ModernButton(
+            text='小说模式', size_hint_x=None, width=dp(82), height=dp(34),
+            background_color=PRIMARY_SOFT, color=PRIMARY_DARK, font_size=sp(11),
+            button_radius=[dp(17)] * 4)
+        self.tavern_btn.bind(on_release=lambda *_: self.toggle_tavern())
+        top.add_widget(self.tavern_btn)
+        regen_btn = ModernButton(text='重试', size_hint_x=None, width=dp(46),
+                                 height=dp(34), background_color=FIELD_BG,
+                                 color=TEXT_DARK, font_size=sp(11),
+                                 button_radius=[dp(17)] * 4)
+        regen_btn.bind(on_release=lambda *_: self.regen())
+        top.add_widget(regen_btn)
+        new_btn = ModernButton(text='新对话', size_hint_x=None, width=dp(56),
+                               height=dp(34), background_color=FIELD_BG,
+                               color=TEXT_DARK, font_size=sp(11),
+                               button_radius=[dp(17)] * 4)
+        new_btn.bind(on_release=lambda *_: self.new_chat())
+        top.add_widget(new_btn)
+        root.add_widget(top)
         self.add_widget(root)
 
     # ---------- 启动 ----------
@@ -488,7 +543,7 @@ class ChatScreen(Screen):
         if not self.hm:
             return
         pet_name = (self.hm.cfg.get('pet_name') or '酒馆').strip()
-        self.title_lbl.text = _emoji_markup('🍻 %s' % pet_name)
+        self.title_lbl.text = pet_name
         self.subtitle_lbl.text = '小说模式已开启' if self.hm.cfg.get('tavern_mode') else '准备好继续你的故事'
 
     def _update_empty_state(self):
@@ -504,12 +559,28 @@ class ChatScreen(Screen):
         if self.empty_state.parent is self.msg_box:
             self.msg_box.remove_widget(self.empty_state)
         b = _bubble(text, is_user)
-        row = AnchorLayout(size_hint_y=None, height=b.height + dp(4),
-                           anchor_x='right' if is_user else 'left', anchor_y='top',
-                           padding=(0, dp(2)))
-        row.add_widget(b)
+        row = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(3),
+                        padding=(0, dp(4)))
+        row.bind(minimum_height=row.setter('height'))
+
+        meta = AnchorLayout(size_hint_y=None, height=dp(23),
+                            anchor_x='right' if is_user else 'left')
+        meta_copy = BoxLayout(size_hint_x=None, width=dp(92), spacing=dp(5))
+        badge = AvatarBadge(text='我' if is_user else '酒', size=(dp(23), dp(23)),
+                            fill_color=PRIMARY if is_user else (0.22, 0.18, 0.38, 1))
+        meta_copy.add_widget(badge)
+        meta_copy.add_widget(_label('我' if is_user else '酒馆', color=MUTED,
+                                    font_size=sp(10), bold=True))
+        meta.add_widget(meta_copy)
+        row.add_widget(meta)
+
+        bubble_holder = AnchorLayout(size_hint_y=None, height=b.height,
+                                     anchor_x='right' if is_user else 'left',
+                                     anchor_y='top')
+        bubble_holder.add_widget(b)
+        row.add_widget(bubble_holder)
         b.chat_row = row
-        b.bind(height=lambda widget, value: setattr(row, 'height', value + dp(4)))
+        b.bind(height=lambda widget, value: setattr(bubble_holder, 'height', value))
         b.long_press_cb = lambda: self.show_bubble_menu(b, is_user)
         self.msg_box.add_widget(row)
         self.scroll_to_bottom()
@@ -520,7 +591,7 @@ class ChatScreen(Screen):
         self.msg_box.clear_widgets()
         self.choices_box.clear_widgets()
         self.choices_box.height = 0
-        self.choices_panel.height = 0
+        self._hide_choices()
         self.load_history()
 
     def scroll_to_bottom(self):
@@ -640,12 +711,14 @@ class ChatScreen(Screen):
             return
         self.hm.cfg['tavern_mode'] = not self.hm.cfg.get('tavern_mode', False)
         ai_core.save_config(self.hm.cfg)
+        if not self.hm.cfg['tavern_mode']:
+            self._hide_choices()
         self.refresh_tavern_btn()
         self._refresh_header()
 
     def refresh_tavern_btn(self):
         on = bool(self.hm and self.hm.cfg.get('tavern_mode'))
-        self.tavern_btn.text = _emoji_markup('📖 小说开' if on else '📖 小说关')
+        self.tavern_btn.text = '小说开' if on else '小说关'
         self.tavern_btn.fill_color = PRIMARY if on else PRIMARY_SOFT
         self.tavern_btn.pressed_color = PRIMARY_DARK if on else (0.84, 0.82, 0.94, 1)
         self.tavern_btn.color = TEXT_WHITE if on else PRIMARY_DARK
@@ -653,7 +726,7 @@ class ChatScreen(Screen):
     def render_choices(self, ai_text):
         self.choices_box.clear_widgets()
         self.choices_box.height = 0
-        self.choices_panel.height = 0
+        self._hide_choices()
         _, choices = ai_core.parse_choices(ai_text or '')
         if not choices:
             return
@@ -667,13 +740,25 @@ class ChatScreen(Screen):
                        halign='left', padding=(dp(12), 0), font_size=sp(13))
             b.bind(on_release=lambda w, choice=c: self.choose(choice))
             self.choices_box.add_widget(b)
-        self.choices_box.height = dp(24) + dp(42) * len(choices) + dp(6) * len(choices)
-        self.choices_panel.height = self.choices_box.height + dp(16)
+        target_height = dp(24) + dp(42) * len(choices) + dp(6) * len(choices) + dp(16)
+        Animation.cancel_all(self.choices_panel, 'height', 'opacity')
+        self.choices_panel.height = 0
+        self.choices_panel.opacity = 0
+        Animation(height=target_height, opacity=1, d=0.18,
+                  t='out_quad').start(self.choices_panel)
+
+    def _hide_choices(self):
+        """Collapse the option tray instead of leaving an empty white surface."""
+        if not hasattr(self, 'choices_panel'):
+            return
+        Animation.cancel_all(self.choices_panel, 'height', 'opacity')
+        self.choices_panel.opacity = 0
+        self.choices_panel.height = 0
 
     def choose(self, choice):
         self.choices_box.clear_widgets()
         self.choices_box.height = 0
-        self.choices_panel.height = 0
+        self._hide_choices()
         self.input.text = choice
         self.send()
 
@@ -782,7 +867,7 @@ class ChatScreen(Screen):
         self.msg_box.clear_widgets()
         self.choices_box.clear_widgets()
         self.choices_box.height = 0
-        self.choices_panel.height = 0
+        self._hide_choices()
         self.hm.new_chat()
         self._update_empty_state()
 
@@ -796,38 +881,40 @@ class WorldbookScreen(Screen):
         self.build_ui()
 
     def build_ui(self):
-        root = BoxLayout(orientation='vertical', padding=(dp(12), dp(10)), spacing=dp(10))
-        top = SurfaceBox(size_hint_y=None, height=dp(70), padding=(dp(14), dp(10)),
-                         spacing=dp(8), surface_color=CARD, border_color=DIVIDER)
+        root = BoxLayout(orientation='vertical', padding=(dp(18), 0, dp(18), 0),
+                         spacing=dp(8))
+        # Worldbook is a focused list page: title bar, search, then dense rows.
+        top = BoxLayout(size_hint_y=None, height=dp(72), padding=(0, dp(12)),
+                        spacing=dp(8))
         heading = BoxLayout(orientation='vertical', spacing=dp(1))
-        heading.add_widget(_label(_emoji_markup('📚 世界书'), markup=_EMOJI_MARKUP_AVAILABLE,
-                                  bold=True, font_size=sp(19), size_hint_y=None,
+        heading.add_widget(_label('世界书', bold=True, font_size=sp(22), size_hint_y=None,
                                   height=dp(31)))
         self.count_lbl = _label('管理会影响角色行为的设定', color=MUTED,
                                 font_size=sp(11), size_hint_y=None, height=dp(20))
         heading.add_widget(self.count_lbl)
         top.add_widget(heading)
-        add_btn = ModernButton(text='＋ 新条目', size_hint_x=None, width=dp(92),
-                               background_color=PRIMARY, color=TEXT_WHITE,
-                               font_size=sp(13))
+        top.add_widget(Widget())
+        add_btn = ModernButton(text='新增', size_hint_x=None, width=dp(64),
+                               height=dp(34), background_color=PRIMARY,
+                               color=TEXT_WHITE, font_size=sp(12),
+                               button_radius=[dp(17)] * 4)
         add_btn.bind(on_release=lambda *_: self.edit_entry(None))
         top.add_widget(add_btn)
         root.add_widget(top)
 
-        search_card = SurfaceBox(size_hint_y=None, height=dp(54), padding=(dp(8), dp(7)),
-                                 surface_color=CARD, border_color=DIVIDER)
+        search_row = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(8))
         self.search_input = ModernTextInput(hint_text='搜索标题、关键词或内容…',
                                             multiline=False, background_color=FIELD_BG,
                                             padding=(dp(12), dp(9)))
         self.search_input.bind(text=lambda *_: self.refresh())
-        search_card.add_widget(self.search_input)
-        root.add_widget(search_card)
+        search_row.add_widget(self.search_input)
+        root.add_widget(search_row)
 
         self.list_scroll = ScrollView(bar_width=dp(3), bar_color=PRIMARY,
                                       bar_inactive_color=DIVIDER,
                                       scroll_type=['bars', 'content'])
-        self.list_box = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(10),
-                                  padding=(dp(2), dp(6)))
+        self.list_box = BoxLayout(orientation='vertical', size_hint_y=None, spacing=0,
+                                  padding=(0, dp(8), 0, dp(76)))
         self.list_box.bind(minimum_height=self.list_box.setter('height'))
         self.list_scroll.add_widget(self.list_box)
         root.add_widget(self.list_scroll)
@@ -851,9 +938,8 @@ class WorldbookScreen(Screen):
                 status = e.get('status', 'green')
                 status_text = {'blue': '常驻', 'green': '关键词触发', 'red': '已禁用'}.get(status, status)
                 status_color = {'blue': PRIMARY, 'green': SUCCESS, 'red': DANGER}.get(status, MUTED)
-                row = SurfaceBox(size_hint_y=None, height=dp(92), spacing=dp(8),
-                                 padding=(dp(10), dp(9)), surface_color=CARD,
-                                 border_color=DIVIDER)
+                row = BoxLayout(size_hint_y=None, height=dp(78), spacing=dp(8),
+                                padding=(0, dp(8)))
                 info = BoxLayout(orientation='vertical', spacing=dp(2), size_hint_x=1)
                 info.add_widget(_label(title, bold=True, font_size=sp(14),
                                        size_hint_y=None, height=dp(26)))
@@ -868,22 +954,24 @@ class WorldbookScreen(Screen):
                                     font_size=sp(11), size_hint_x=None, width=dp(62),
                                     halign='center')
                 row.add_widget(status_lbl)
-                ebtn = ModernButton(text='编辑', size_hint_x=None, width=dp(54),
+                ebtn = ModernButton(text='编辑', size_hint_x=None, width=dp(48),
                               background_color=FIELD_BG, color=TEXT_DARK,
-                              font_size=sp(12))
+                              font_size=sp(11), button_radius=[dp(15)] * 4)
                 ebtn.bind(on_release=lambda w, bk=wb, en=e: self.edit_entry(en, bk))
                 row.add_widget(ebtn)
-                dbtn = ModernButton(text='删除', size_hint_x=None, width=dp(58),
+                dbtn = ModernButton(text='删除', size_hint_x=None, width=dp(48),
                               background_color=(1.0, 0.91, 0.93, 1), color=DANGER,
-                              font_size=sp(12))
+                              font_size=sp(11), button_radius=[dp(15)] * 4)
                 dbtn.bind(on_release=lambda w, bk=wb, en=e: self.delete_entry(bk, en))
                 row.add_widget(dbtn)
-                self.list_box.add_widget(row)
+                row_wrap = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(79))
+                row_wrap.add_widget(row)
+                row_wrap.add_widget(Divider())
+                self.list_box.add_widget(row_wrap)
         self.count_lbl.text = '%d 个条目%s' % (visible, ' · 已过滤' if query else '')
         if not visible:
-            empty = SurfaceBox(orientation='vertical', size_hint_y=None, height=dp(150),
-                               padding=(dp(18), dp(16)), spacing=dp(4),
-                               surface_color=CARD, border_color=DIVIDER)
+            empty = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(150),
+                              padding=(dp(18), dp(16)), spacing=dp(4))
             empty.add_widget(_label('还没有匹配的设定', bold=True, font_size=sp(16),
                                     halign='center', size_hint_y=None, height=dp(30)))
             empty.add_widget(_label('新增一条世界书内容，让角色拥有更稳定的背景记忆。',
@@ -1025,12 +1113,11 @@ class SettingsScreen(Screen):
         self.build_ui()
 
     def build_ui(self):
-        root = BoxLayout(orientation='vertical', padding=(dp(12), dp(10)), spacing=dp(10))
-        top = SurfaceBox(size_hint_y=None, height=dp(70), padding=(dp(14), dp(10)),
-                         surface_color=CARD, border_color=DIVIDER)
+        root = BoxLayout(orientation='vertical', padding=(dp(18), 0, dp(18), 0),
+                         spacing=dp(8))
+        top = BoxLayout(size_hint_y=None, height=dp(72), padding=(0, dp(12)))
         heading = BoxLayout(orientation='vertical', spacing=dp(1))
-        heading.add_widget(_label(_emoji_markup('⚙️ 设置'), markup=_EMOJI_MARKUP_AVAILABLE,
-                                  bold=True, font_size=sp(19), size_hint_y=None,
+        heading.add_widget(_label('设置', bold=True, font_size=sp(22), size_hint_y=None,
                                   height=dp(31)))
         heading.add_widget(_label('连接、角色和回复行为都保存在本机', color=MUTED,
                                  font_size=sp(11), size_hint_y=None, height=dp(20)))
@@ -1040,28 +1127,24 @@ class SettingsScreen(Screen):
         scroll = ScrollView(bar_width=dp(3), bar_color=PRIMARY,
                             bar_inactive_color=DIVIDER,
                             scroll_type=['bars', 'content'])
-        form = BoxLayout(orientation='vertical', spacing=dp(9), padding=(dp(2), dp(4)),
+        form = BoxLayout(orientation='vertical', spacing=dp(7), padding=(0, dp(4), 0, dp(74)),
                          size_hint_y=None)
         form.bind(minimum_height=form.setter('height'))
 
         def group(title, subtitle):
             form.add_widget(_section_header(title, subtitle))
-            form.add_widget(Divider())
+            form.add_widget(Widget(size_hint_y=None, height=dp(3)))
 
         def field(label, key, hint='', multiline=False, password=False):
             input_height = dp(94) if multiline else dp(44)
-            card_height = dp(132) if multiline else dp(82)
-            card = SurfaceBox(orientation='vertical', size_hint_y=None, height=card_height,
-                              padding=(dp(12), dp(8)), spacing=dp(3),
-                              surface_color=CARD, border_color=DIVIDER)
-            card.add_widget(_label(label, color=MUTED, font_size=sp(11),
+            form.add_widget(_label(label, color=MUTED, font_size=sp(11),
                                    size_hint_y=None, height=dp(20)))
             ti = ModernTextInput(hint_text=hint, multiline=multiline,
                                  password=password, size_hint_y=None,
                                  height=input_height, background_color=FIELD_BG,
                                  foreground_color=TEXT_DARK)
-            card.add_widget(ti)
-            form.add_widget(card)
+            form.add_widget(ti)
+            form.add_widget(Widget(size_hint_y=None, height=dp(6)))
             self.fields[key] = ti
 
         group('连接与模型', '兼容 OpenAI 风格接口；API Key 只保存在当前设备')
@@ -1083,8 +1166,8 @@ class SettingsScreen(Screen):
         field('温度（0～2）', 'temperature', '默认 0.8')
 
         def toggle(label, description, checkbox):
-            card = SurfaceBox(size_hint_y=None, height=dp(62), padding=(dp(12), dp(8)),
-                              spacing=dp(8), surface_color=CARD, border_color=DIVIDER)
+            card = BoxLayout(size_hint_y=None, height=dp(60), padding=(0, dp(7)),
+                             spacing=dp(8))
             copy = BoxLayout(orientation='vertical', spacing=dp(1))
             copy.add_widget(_label(label, font_size=sp(13), size_hint_y=None, height=dp(23)))
             copy.add_widget(_label(description, color=MUTED, font_size=sp(10),
@@ -1094,6 +1177,7 @@ class SettingsScreen(Screen):
             checkbox.width = dp(42)
             card.add_widget(checkbox)
             form.add_widget(card)
+            form.add_widget(Divider())
 
         self.ck_thinking = CheckBox(active=False)
         self.ck_bm25 = CheckBox(active=True)
@@ -1106,14 +1190,14 @@ class SettingsScreen(Screen):
         scroll.add_widget(form)
         root.add_widget(scroll)
 
-        save_bar = SurfaceBox(size_hint_y=None, height=dp(66), padding=(dp(9), dp(8)),
-                              spacing=dp(8), surface_color=CARD, border_color=DIVIDER)
+        save_bar = BoxLayout(size_hint_y=None, height=dp(62), padding=(0, dp(8)),
+                             spacing=dp(8))
         self.save_status = _label('修改只保存在当前设备', color=MUTED, font_size=sp(11))
         save_bar.add_widget(self.save_status)
         save_btn = ModernButton(text='保存设置',
                                 size_hint_x=None, width=dp(112),
                                 background_color=PRIMARY, color=TEXT_WHITE,
-                                font_size=sp(13))
+                                font_size=sp(13), button_radius=[dp(17)] * 4)
         save_btn.bind(on_release=lambda *_: self.save_cfg())
         save_bar.add_widget(save_btn)
         root.add_widget(save_bar)
@@ -1166,7 +1250,7 @@ class SettingsScreen(Screen):
 # 底部导航 + App
 # --------------------------------------------------------------------------- #
 class NavBar(BoxLayout):
-    """Bottom navigation with a clear active tab instead of three identical buttons."""
+    """Slim bottom navigation with a single active pill."""
 
     def __init__(self, on_select=None, **kwargs):
         super().__init__(orientation='horizontal', **kwargs)
@@ -1174,9 +1258,9 @@ class NavBar(BoxLayout):
         self.buttons = {}
 
     def add_tab(self, text, name):
-        button = ModernButton(text=_emoji_markup(text), markup=_EMOJI_MARKUP_AVAILABLE,
-                              background_color=FIELD_BG, color=MUTED,
-                              font_size=sp(12))
+        button = ModernButton(text=text, background_color=(0, 0, 0, 0),
+                              color=MUTED, font_size=sp(12),
+                              button_radius=[dp(17)] * 4)
         button.bind(on_release=lambda *_: self._select(name))
         self.buttons[name] = button
         self.add_widget(button)
@@ -1188,8 +1272,8 @@ class NavBar(BoxLayout):
     def set_active(self, name):
         for tab_name, button in self.buttons.items():
             active = tab_name == name
-            button.fill_color = PRIMARY_SOFT if active else FIELD_BG
-            button.pressed_color = (0.84, 0.82, 0.94, 1) if active else (0.91, 0.90, 0.94, 1)
+            button.fill_color = PRIMARY_SOFT if active else (0, 0, 0, 0)
+            button.pressed_color = (0.84, 0.82, 0.94, 1) if active else (0.94, 0.93, 0.97, 1)
             button.color = PRIMARY_DARK if active else MUTED
 
 
@@ -1207,14 +1291,16 @@ class PetApp(App):
 
         root = BoxLayout(orientation='vertical')
         root.add_widget(sm)
-        nav_surface = SurfaceBox(size_hint_y=None, height=dp(72), padding=(dp(6), dp(6)),
-                                 spacing=dp(6), surface_color=CARD, border_color=DIVIDER)
+        nav_surface = SurfaceBox(size_hint_y=None, height=dp(62), padding=(dp(14), dp(6)),
+                                 spacing=dp(6), surface_color=CARD,
+                                 border_color=(0, 0, 0, 0),
+                                 surface_radius=[dp(20)] * 4)
 
         def go(name):
             sm.current = name
 
         nav = NavBar(on_select=go, spacing=dp(6))
-        for text, name in (('💬  聊天', 'chat'), ('📚  世界书', 'world'), ('⚙️  设置', 'settings')):
+        for text, name in (('聊天', 'chat'), ('世界书', 'world'), ('设置', 'settings')):
             nav.add_tab(text, name)
         nav_surface.add_widget(nav)
         root.add_widget(nav_surface)

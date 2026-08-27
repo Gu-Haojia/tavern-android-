@@ -13,7 +13,7 @@ package.domain = org.example
 # 源文件入口
 source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ttf,txt,json
-source.exclude_dirs = tests, bin, .git, .github
+source.exclude_dirs = tests, bin, .git, .github, .buildozer
 
 # 依赖：ai_core 只用 Python 标准库，Kivy 提供 UI
 # ⚠️ buildozer requirements 格式严格：
@@ -21,8 +21,17 @@ source.exclude_dirs = tests, bin, .git, .github
 #   - 不要写 >=3.0,<3.5 这类版本约束（buildozer 按逗号分割会错把 <3.5 当成独立包）
 #   - distro / charset_normalizer 是普通 pip 包（不是 p4a recipe），放 [app] requirements；
 #     p4a 会通过 pip 装上
-#   - Python 版本靠 [p4a] bootstrap=sd12 固定到 3.12（[p4a] requirements 里也只写 python3，不是 python3.12）
+#   - Python 版本不是靠 bootstrap 名控制的（网上“sd12=Python 3.12”是误读）；
+#     避免 3.14 问题的关键是 p4a.branch = master（见下）
 requirements = python3,kivy,distro,charset_normalizer
+
+# 强制 p4a 用 master 分支；buildozer 1.5.0 默认会拉 develop,
+# develop 要求 hostpython3 3.14,其内置 pip 内部模块不匹配,会报 BuildDependencyInstallError
+p4a.branch = master
+
+# p4a bootstrap：合法取值仅 sdl2 / service_only / webview / qt 等，没有 sd12。
+# sdl2 是安卓图形应用标准 bootstrap（Kivy 走 SDL2）。
+p4a.bootstrap = sdl2
 
 # 竖屏（手机聊天应用）
 orientation = portrait
@@ -47,9 +56,3 @@ android.archs = arm64-v8a
 android.accept_sdk_license = True
 # 打包为 debug 版（无需签名配置，适合自用）
 android.debug_artifact_name = tavernpet-debug
-
-[p4a]
-# bootstrap=sd12 = Python 3.12（p4a 默认是 3.14，太新很多包没 Android wheel）
-# requirements 只放 p4a recipe 名（python3 / kivy）；普通 pip 包放 [app] requirements
-bootstrap = sd12
-requirements = python3,kivy

@@ -122,14 +122,14 @@ class ChatScreen(Screen):
         root = BoxLayout(orientation='vertical')
         # 顶部栏：标题 + 小说开关 + 新对话
         top = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), 0))
-        self.title_lbl = Label(text='🍻 酒馆', size_hint_x=0.5, halign='left',
+        self.title_lbl = Label(text='酒馆', size_hint_x=0.5, halign='left',
                                color=TEXT_DARK, bold=True, font_size=sp(18))
         top.add_widget(self.title_lbl)
-        self.tavern_btn = Button(text='📖 小说: 关', size_hint_x=None, width=dp(110),
+        self.tavern_btn = Button(text='小说: 关', size_hint_x=None, width=dp(110),
                                  background_color=(0.75, 0.78, 0.82, 1), color=TEXT_DARK)
         self.tavern_btn.bind(on_release=lambda *_: self.toggle_tavern())
         top.add_widget(self.tavern_btn)
-        regen_btn = Button(text='🔄', size_hint_x=None, width=dp(44),
+        regen_btn = Button(text='重', size_hint_x=None, width=dp(44),
                            background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
         regen_btn.bind(on_release=lambda *_: self.regen())
         top.add_widget(regen_btn)
@@ -245,7 +245,7 @@ class ChatScreen(Screen):
             # 流式结束后收尾
             Clock.schedule_once(lambda *_: self.on_finished(ai_text, usage), 0)
         except Exception as e:
-            err = '⚠️ 出错了: %s' % e
+            err = '出错了: %s' % e
             Clock.schedule_once(lambda *_: self.add_bubble(err, False), 0)
             Clock.schedule_once(lambda *_: self.on_finished('', None), 0)
 
@@ -288,7 +288,7 @@ class ChatScreen(Screen):
         rtext = '\n'.join(parts).strip()
         if not rtext:
             return
-        tip = Label(text='💭 ' + rtext, font_size=sp(11), color=(0.55, 0.57, 0.63, 1),
+        tip = Label(text='思考：' + rtext, font_size=sp(11), color=(0.55, 0.57, 0.63, 1),
                     halign='left', valign='top', size_hint=(0.78, None),
                     text_size=(dp(280), None), padding=(dp(16), 0))
         tip.bind(size=lambda w, _: setattr(w, 'height', w.text_size[1] + dp(8)))
@@ -311,7 +311,7 @@ class ChatScreen(Screen):
 
     def refresh_tavern_btn(self):
         on = bool(self.hm and self.hm.cfg.get('tavern_mode'))
-        self.tavern_btn.text = '📖 小说: 开' if on else '📖 小说: 关'
+        self.tavern_btn.text = '小说: 开' if on else '小说: 关'
         self.tavern_btn.background_color = (0.28, 0.55, 1.0, 1) if on else (0.75, 0.78, 0.82, 1)
         self.tavern_btn.color = TEXT_WHITE if on else TEXT_DARK
 
@@ -322,7 +322,7 @@ class ChatScreen(Screen):
         if not choices:
             return
         for c in choices:
-            b = Button(text='▶ ' + c, size_hint_y=None, height=dp(42),
+            b = Button(text=c, size_hint_y=None, height=dp(42),
                        background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK,
                        halign='left', padding=(dp(10), 0))
             b.bind(on_release=lambda w, choice=c: self.choose(choice))
@@ -363,16 +363,16 @@ class ChatScreen(Screen):
         pop = Popup(title='气泡操作', size_hint=(0.8, None), height=dp(240))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
         if is_user:
-            b_edit = Button(text='✏️ 编辑并重新生成',
+            b_edit = Button(text='编辑并重新生成',
                             background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
             b_edit.bind(on_release=lambda *_: (pop.dismiss(), self.edit_bubble(bubble)))
             box.add_widget(b_edit)
         else:
-            b_regen = Button(text='🔄 重新生成',
+            b_regen = Button(text='重新生成',
                              background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
             b_regen.bind(on_release=lambda *_: (pop.dismiss(), self.regen()))
             box.add_widget(b_regen)
-        b_del = Button(text='🗑 删除', background_color=(0.9, 0.6, 0.6, 1), color=TEXT_WHITE)
+        b_del = Button(text='删除', background_color=(0.9, 0.6, 0.6, 1), color=TEXT_WHITE)
         b_del.bind(on_release=lambda *_: (pop.dismiss(), self.delete_bubble(bubble, is_user)))
         box.add_widget(b_del)
         b_cancel = Button(text='取消', background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
@@ -444,7 +444,7 @@ class WorldbookScreen(Screen):
     def build_ui(self):
         root = BoxLayout(orientation='vertical')
         top = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), 0))
-        top.add_widget(Label(text='📚 世界书', bold=True, color=TEXT_DARK, font_size=sp(18)))
+        top.add_widget(Label(text='世界书', bold=True, color=TEXT_DARK, font_size=sp(18)))
         root.add_widget(top)
 
         self.list_scroll = ScrollView()
@@ -564,7 +564,7 @@ class SettingsScreen(Screen):
     def build_ui(self):
         root = BoxLayout(orientation='vertical')
         top = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), 0))
-        top.add_widget(Label(text='⚙️ 设置', bold=True, color=TEXT_DARK, font_size=sp(18)))
+        top.add_widget(Label(text='设置', bold=True, color=TEXT_DARK, font_size=sp(18)))
         root.add_widget(top)
 
         scroll = ScrollView()
@@ -616,7 +616,7 @@ class SettingsScreen(Screen):
         row2.add_widget(self.ck_delai)
         form.add_widget(row2)
 
-        save_btn = Button(text='💾 保存设置', size_hint_y=None, height=dp(50),
+        save_btn = Button(text='保存设置', size_hint_y=None, height=dp(50),
                           background_color=BLUE, color=TEXT_WHITE)
         save_btn.bind(on_release=lambda *_: self.save_cfg())
         form.add_widget(save_btn)
@@ -686,7 +686,7 @@ class PetApp(App):
         def go(name):
             sm.current = name
 
-        for text, name in (('💬 聊天', 'chat'), ('📚 世界书', 'world'), ('⚙️ 设置', 'settings')):
+        for text, name in (('聊天', 'chat'), ('世界书', 'world'), ('设置', 'settings')):
             b = Button(text=text, background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
             b.bind(on_release=lambda w, n=name: go(n))
             nav.add_widget(b)

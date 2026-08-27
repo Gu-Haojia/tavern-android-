@@ -181,6 +181,11 @@ class ModernButton(Button):
     fill_color = ListProperty(CARD)
 
     def __init__(self, **kwargs):
+        # 统一保证所有页面的输入文字都与浅色输入底有足够对比度。
+        kwargs.setdefault('foreground_color', TEXT_DARK)
+        kwargs.setdefault('hint_text_color', MUTED)
+        kwargs.setdefault('selection_color', (0.18, 0.43, 1.0, 0.25))
+        kwargs.setdefault('background_color', CARD)
         super().__init__(**kwargs)
         self.fill_color = list(self.background_color)
         # Button's own rectangle is square; the visible background is our rounded layer.

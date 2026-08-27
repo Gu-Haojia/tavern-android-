@@ -11,6 +11,7 @@ import time
 
 from kivy.app import App
 from kivy.core.text import LabelBase
+from kivy.core.window import Window
 from kivy.lang import Builder
 from kivy.utils import escape_markup
 from kivy.uix.screenmanager import ScreenManager, Screen
@@ -26,6 +27,8 @@ from kivy.uix.checkbox import CheckBox
 from kivy.uix.anchorlayout import AnchorLayout
 from kivy.clock import Clock
 from kivy.metrics import dp, sp
+from kivy.graphics import Color, RoundedRectangle
+from kivy.properties import ListProperty
 
 import ai_core
 
@@ -145,18 +148,86 @@ USER_BG = (0.18, 0.43, 1.0, 1.0)
 TEXT_DARK = (0.13, 0.15, 0.18, 1.0)
 TEXT_WHITE = (1, 1, 1, 1)
 BG = (0.96, 0.97, 0.98, 1.0)
+CARD = (1, 1, 1, 1)
+MUTED = (0.48, 0.51, 0.56, 1.0)
+Window.clearcolor = BG
 
 
-class BubbleButton(Button):
+class SurfaceBox(BoxLayout):
+    """A small rounded surface used for toolbars and the composer."""
+
+    surface_color = ListProperty(CARD)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        with self.canvas.before:
+            self._surface_color = Color(rgba=self.surface_color)
+            self._surface_rect = RoundedRectangle(
+                pos=self.pos, size=self.size,
+                radius=[(dp(16), dp(16))] * 4)
+        self.bind(pos=self._sync_surface, size=self._sync_surface,
+                  surface_color=self._sync_surface)
+        self._sync_surface()
+
+    def _sync_surface(self, *_):
+        self._surface_color.rgba = self.surface_color
+        self._surface_rect.pos = self.pos
+        self._surface_rect.size = self.size
+
+
+class ModernButton(Button):
+    """Flat rounded button without Kivy's dated square texture."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.background_normal = ''
+        self.background_down = ''
+        self.background_disabled = ''
+        with self.canvas.before:
+            self._button_color = Color(rgba=self.background_color)
+            self._button_rect = RoundedRectangle(
+                pos=self.pos, size=self.size,
+                radius=[(dp(12), dp(12))] * 4)
+        self.bind(pos=self._sync_button, size=self._sync_button,
+                  background_color=self._sync_button)
+        self._sync_button()
+
+    def _sync_button(self, *_):
+        self._button_color.rgba = self.background_color
+        self._button_rect.pos = self.pos
+        self._button_rect.size = self.size
+
+
+class ModernTextInput(TextInput):
+    """Clean rounded text field with the same predictable Android fallback font."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.background_normal = ''
+        self.background_active = ''
+        with self.canvas.before:
+            self._input_color = Color(rgba=self.background_color)
+            self._input_rect = RoundedRectangle(
+                pos=self.pos, size=self.size,
+                radius=[(dp(10), dp(10))] * 4)
+        self.bind(pos=self._sync_input, size=self._sync_input,
+                  background_color=self._sync_input)
+        self._sync_input()
+
+    def _sync_input(self, *_):
+        self._input_color.rgba = self.background_color
+        self._input_rect.pos = self.pos
+        self._input_rect.size = self.size
+
+
+class BubbleButton(ModernButton):
     """聊天气泡：长按（≥0.5s）触发菜单。不 disabled（disabled 会吞掉触摸事件）。"""
 
     def __init__(self, **kw):
         super().__init__(**kw)
         self.long_press_cb = None
         self._press_at = None
-        self.background_normal = ''
-        self.background_down = ''
-        self.background_disabled = ''
+        self._button_rect.radius = [(dp(18), dp(18))] * 4
 
     def on_touch_down(self, touch):
         if self.collide_point(*touch.pos):
@@ -179,21 +250,27 @@ def _bubble(text, is_user):
     btn = BubbleButton(
         text=_emoji_markup(raw_text),
         markup=_EMOJI_MARKUP_AVAILABLE,
-        size_hint=(0.78, None),
+        size_hint_x=0.84,
+        size_hint_y=None,
         # NumericProperty 不接受 None；先给气泡一个最小高度，随后按文本高度调整。
         height=dp(44),
-        halign='left' if not is_user else 'right',
+        halign='left',
         valign='middle',
         text_size=(None, None),
         background_color=USER_BG if is_user else AI_BG,
         color=TEXT_WHITE if is_user else TEXT_DARK,
-        padding=(dp(14), dp(10)),
+        padding=(dp(14), dp(11)),
     )
-    btn.text_size = (dp(280), None)
+
+    def update_bubble_width(widget, _):
+        widget.text_size = (max(dp(90), widget.width - dp(28)), None)
+
+    btn.bind(width=update_bubble_width)
+    Clock.schedule_once(update_bubble_width, 0)
 
     def update_bubble_height(widget, _):
         text_height = widget.texture_size[1] or 0
-        widget.height = max(dp(44), text_height + dp(24))
+        widget.height = max(dp(48), text_height + dp(24))
 
     btn.bind(texture_size=update_bubble_height)
     btn.raw_text = raw_text
@@ -217,33 +294,35 @@ class ChatScreen(Screen):
 
     # ---------- UI ----------
     def build_ui(self):
-        root = BoxLayout(orientation='vertical')
+        root = BoxLayout(orientation='vertical', padding=(dp(10), dp(8)), spacing=dp(8))
         # 顶部栏：标题 + 小说开关 + 新对话
-        top = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), 0))
+        top = SurfaceBox(size_hint_y=None, height=dp(56), padding=(dp(12), dp(6)),
+                         spacing=dp(6), surface_color=CARD)
         self.title_lbl = Label(text=_emoji_markup('🍻 酒馆'), markup=_EMOJI_MARKUP_AVAILABLE,
                                size_hint_x=0.5, halign='left',
                                color=TEXT_DARK, bold=True, font_size=sp(18))
         top.add_widget(self.title_lbl)
-        self.tavern_btn = Button(text=_emoji_markup('📖 小说: 关'), markup=_EMOJI_MARKUP_AVAILABLE,
+        self.tavern_btn = ModernButton(text=_emoji_markup('📖 小说: 关'), markup=_EMOJI_MARKUP_AVAILABLE,
                                  size_hint_x=None, width=dp(110),
                                  background_color=(0.75, 0.78, 0.82, 1), color=TEXT_DARK)
         self.tavern_btn.bind(on_release=lambda *_: self.toggle_tavern())
         top.add_widget(self.tavern_btn)
-        regen_btn = Button(text=_emoji_markup('🔄'), markup=_EMOJI_MARKUP_AVAILABLE,
+        regen_btn = ModernButton(text=_emoji_markup('🔄'), markup=_EMOJI_MARKUP_AVAILABLE,
                            size_hint_x=None, width=dp(44),
                            background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
         regen_btn.bind(on_release=lambda *_: self.regen())
         top.add_widget(regen_btn)
-        new_btn = Button(text='新对话', size_hint_x=None, width=dp(80),
+        new_btn = ModernButton(text='新对话', size_hint_x=None, width=dp(80),
                          background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
         new_btn.bind(on_release=lambda *_: self.new_chat())
         top.add_widget(new_btn)
         root.add_widget(top)
 
         # 消息滚动区
-        self.scroll = ScrollView()
+        self.scroll = ScrollView(bar_width=dp(4), bar_color=BLUE,
+                                 bar_inactive_color=(0.75, 0.78, 0.83, 1))
         self.msg_box = BoxLayout(orientation='vertical', size_hint_y=None,
-                                 spacing=dp(8), padding=(dp(10), dp(10)))
+                                 spacing=dp(10), padding=(dp(4), dp(10)))
         self.msg_box.bind(minimum_height=self.msg_box.setter('height'))
         self.scroll.add_widget(self.msg_box)
         root.add_widget(self.scroll)
@@ -255,13 +334,16 @@ class ChatScreen(Screen):
         root.add_widget(self.choices_box)
 
         # 输入区
-        bottom = BoxLayout(size_hint_y=None, height=dp(56), padding=(dp(8), dp(6)), spacing=dp(8))
-        self.input = TextInput(hint_text='说点什么…', multiline=False,
+        bottom = SurfaceBox(size_hint_y=None, height=dp(64), padding=(dp(8), dp(8)),
+                            spacing=dp(8), surface_color=CARD)
+        self.input = ModernTextInput(hint_text='说点什么…', multiline=False,
                                size_hint_x=0.78, background_color=(1, 1, 1, 1),
-                               foreground_color=TEXT_DARK)
+                               background_normal='', background_active='',
+                               hint_text_color=MUTED, foreground_color=TEXT_DARK,
+                               padding=(dp(14), dp(10)))
         self.input.bind(on_text_validate=lambda *_: self.send())
         bottom.add_widget(self.input)
-        send_btn = Button(text='发送', size_hint_x=0.22, background_color=BLUE,
+        send_btn = ModernButton(text='发送', size_hint_x=0.22, background_color=BLUE,
                           color=TEXT_WHITE)
         send_btn.bind(on_release=lambda *_: self.send())
         bottom.add_widget(send_btn)
@@ -283,8 +365,14 @@ class ChatScreen(Screen):
     # ---------- 气泡 ----------
     def add_bubble(self, text, is_user):
         b = _bubble(text, is_user)
+        row = AnchorLayout(size_hint_y=None, height=b.height + dp(4),
+                           anchor_x='right' if is_user else 'left', anchor_y='top',
+                           padding=(0, dp(2)))
+        row.add_widget(b)
+        b.chat_row = row
+        b.bind(height=lambda widget, value: setattr(row, 'height', value + dp(4)))
         b.long_press_cb = lambda: self.show_bubble_menu(b, is_user)
-        self.msg_box.add_widget(b)
+        self.msg_box.add_widget(row)
         self.scroll_to_bottom()
         return b
 
@@ -386,7 +474,7 @@ class ChatScreen(Screen):
         if not rtext:
             return
         tip = Label(text=_emoji_markup('💭 ' + rtext), markup=_EMOJI_MARKUP_AVAILABLE,
-                    font_size=sp(11), color=(0.55, 0.57, 0.63, 1),
+                    font_size=sp(11), color=MUTED,
                     halign='left', valign='top', size_hint=(0.78, None),
                     text_size=(dp(280), None), padding=(dp(16), 0))
         tip.bind(size=lambda w, _: setattr(w, 'height', w.text_size[1] + dp(8)))
@@ -420,7 +508,7 @@ class ChatScreen(Screen):
         if not choices:
             return
         for c in choices:
-            b = Button(text=_emoji_markup('▶ ' + c), markup=_EMOJI_MARKUP_AVAILABLE,
+            b = ModernButton(text=_emoji_markup('▶ ' + c), markup=_EMOJI_MARKUP_AVAILABLE,
                        size_hint_y=None, height=dp(42),
                        background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK,
                        halign='left', padding=(dp(10), 0))
@@ -463,20 +551,20 @@ class ChatScreen(Screen):
                     size_hint=(0.8, None), height=dp(240))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
         if is_user:
-            b_edit = Button(text=_emoji_markup('✏️ 编辑并重新生成'), markup=_EMOJI_MARKUP_AVAILABLE,
+            b_edit = ModernButton(text=_emoji_markup('✏️ 编辑并重新生成'), markup=_EMOJI_MARKUP_AVAILABLE,
                             background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
             b_edit.bind(on_release=lambda *_: (pop.dismiss(), self.edit_bubble(bubble)))
             box.add_widget(b_edit)
         else:
-            b_regen = Button(text=_emoji_markup('🔄 重新生成'), markup=_EMOJI_MARKUP_AVAILABLE,
+            b_regen = ModernButton(text=_emoji_markup('🔄 重新生成'), markup=_EMOJI_MARKUP_AVAILABLE,
                              background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
             b_regen.bind(on_release=lambda *_: (pop.dismiss(), self.regen()))
             box.add_widget(b_regen)
-        b_del = Button(text=_emoji_markup('🗑 删除'), markup=_EMOJI_MARKUP_AVAILABLE,
+        b_del = ModernButton(text=_emoji_markup('🗑 删除'), markup=_EMOJI_MARKUP_AVAILABLE,
                        background_color=(0.9, 0.6, 0.6, 1), color=TEXT_WHITE)
         b_del.bind(on_release=lambda *_: (pop.dismiss(), self.delete_bubble(bubble, is_user)))
         box.add_widget(b_del)
-        b_cancel = Button(text='取消', background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
+        b_cancel = ModernButton(text='取消', background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
         b_cancel.bind(on_release=lambda *_: pop.dismiss())
         box.add_widget(b_cancel)
         pop.add_widget(box)
@@ -489,12 +577,12 @@ class ChatScreen(Screen):
             return
         pop = Popup(title='编辑消息', title_font=_UI_FONT_NAME, size_hint=(0.9, 0.6))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
-        t_input = TextInput(text=bubble.raw_text, multiline=True, foreground_color=TEXT_DARK,
+        t_input = ModernTextInput(text=bubble.raw_text, multiline=True, foreground_color=TEXT_DARK,
                             font_name=_UI_FONT_NAME)
         box.add_widget(t_input)
         btns = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(8))
-        ok = Button(text='保存并重新生成', background_color=BLUE, color=TEXT_WHITE)
-        cancel = Button(text='取消', background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
+        ok = ModernButton(text='保存并重新生成', background_color=BLUE, color=TEXT_WHITE)
+        cancel = ModernButton(text='取消', background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
 
         def on_save(_):
             new_text = t_input.text.strip()
@@ -544,20 +632,22 @@ class WorldbookScreen(Screen):
         self.build_ui()
 
     def build_ui(self):
-        root = BoxLayout(orientation='vertical')
-        top = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), 0))
+        root = BoxLayout(orientation='vertical', padding=(dp(10), dp(8)), spacing=dp(8))
+        top = SurfaceBox(size_hint_y=None, height=dp(56), padding=(dp(12), dp(6)),
+                         surface_color=CARD)
         top.add_widget(Label(text=_emoji_markup('📚 世界书'), markup=_EMOJI_MARKUP_AVAILABLE,
                              bold=True, color=TEXT_DARK, font_size=sp(18)))
         root.add_widget(top)
 
-        self.list_scroll = ScrollView()
-        self.list_box = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(6),
-                                  padding=(dp(10), dp(10)))
+        self.list_scroll = ScrollView(bar_width=dp(4), bar_color=BLUE,
+                                      bar_inactive_color=(0.75, 0.78, 0.83, 1))
+        self.list_box = BoxLayout(orientation='vertical', size_hint_y=None, spacing=dp(8),
+                                  padding=(dp(4), dp(6)))
         self.list_box.bind(minimum_height=self.list_box.setter('height'))
         self.list_scroll.add_widget(self.list_box)
         root.add_widget(self.list_scroll)
 
-        add_btn = Button(text='＋ 新增条目', size_hint_y=None, height=dp(48),
+        add_btn = ModernButton(text='＋ 新增条目', size_hint_y=None, height=dp(48),
                          background_color=BLUE, color=TEXT_WHITE)
         add_btn.bind(on_release=lambda *_: self.edit_entry(None))
         root.add_widget(add_btn)
@@ -572,15 +662,16 @@ class WorldbookScreen(Screen):
             for i, e in enumerate(wb.get('entries', [])):
                 title = e.get('title') or '未命名'
                 kw = '，'.join(e.get('primary_keywords') or []) or '（无关键词·常驻）'
-                row = BoxLayout(size_hint_y=None, height=dp(56), spacing=dp(6))
+                row = SurfaceBox(size_hint_y=None, height=dp(64), spacing=dp(6),
+                                 padding=(dp(8), dp(6)), surface_color=CARD)
                 info = Label(text='[b]%s[/b]\n%s' % (title, kw),
                              markup=True, halign='left', color=TEXT_DARK, size_hint_x=0.6)
                 row.add_widget(info)
-                ebtn = Button(text='编辑', size_hint_x=0.2, background_color=(0.85, 0.87, 0.9, 1),
+                ebtn = ModernButton(text='编辑', size_hint_x=0.2, background_color=(0.85, 0.87, 0.9, 1),
                               color=TEXT_DARK)
                 ebtn.bind(on_release=lambda w, bk=wb, en=e: self.edit_entry(en, bk))
                 row.add_widget(ebtn)
-                dbtn = Button(text='删', size_hint_x=0.2, background_color=(0.9, 0.6, 0.6, 1),
+                dbtn = ModernButton(text='删', size_hint_x=0.2, background_color=(0.9, 0.6, 0.6, 1),
                               color=TEXT_WHITE)
                 dbtn.bind(on_release=lambda w, bk=wb, en=e: self.delete_entry(bk, en))
                 row.add_widget(dbtn)
@@ -596,42 +687,44 @@ class WorldbookScreen(Screen):
                 wb = books[0]
         e = dict(entry or ai_core.default_entry())
 
-        content = Popup(title='世界书条目', title_font=_UI_FONT_NAME, size_hint=(0.92, 0.9))
+        content = Popup(title='世界书条目', title_font=_UI_FONT_NAME,
+                        background_color=(0.16, 0.18, 0.22, 1), size_hint=(0.92, 0.9))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
-        t_title = TextInput(text=e.get('title') or '', hint_text='标题', multiline=False,
+        t_title = ModernTextInput(text=e.get('title') or '', hint_text='标题', multiline=False,
                             font_name=_UI_FONT_NAME)
-        t_content = TextInput(text=e.get('content') or '', hint_text='内容（触发后注入的设定）',
+        t_content = ModernTextInput(text=e.get('content') or '', hint_text='内容（触发后注入的设定）',
                               multiline=True, font_name=_UI_FONT_NAME)
-        t_kw = TextInput(text='，'.join(e.get('primary_keywords') or []),
+        t_kw = ModernTextInput(text='，'.join(e.get('primary_keywords') or []),
                          hint_text='关键词（逗号分隔，聊到才触发）', multiline=False,
                          font_name=_UI_FONT_NAME)
-        t_order = TextInput(text=str(e.get('order', 100)), hint_text='顺序值（越大越靠下越强）',
+        t_order = ModernTextInput(text=str(e.get('order', 100)), hint_text='顺序值（越大越靠下越强）',
                             multiline=False, font_name=_UI_FONT_NAME)
         st_spin = Spinner(text=e.get('status', 'green'), values=('blue', 'green', 'red'),
                           font_name=_UI_FONT_NAME)
         pos_spin = Spinner(text=e.get('position', 'before_char'),
                            values=('before_char', 'after_char', 'after_an', 'depth'),
                            font_name=_UI_FONT_NAME)
-        box.add_widget(Label(text='标题', font_name=_UI_FONT_NAME, color=TEXT_DARK,
+        box.add_widget(Label(text='标题', font_name=_UI_FONT_NAME, color=TEXT_WHITE,
                              size_hint_y=None, height=dp(22)))
         box.add_widget(t_title)
-        box.add_widget(Label(text='内容', font_name=_UI_FONT_NAME, color=TEXT_DARK,
+        box.add_widget(Label(text='内容', font_name=_UI_FONT_NAME, color=TEXT_WHITE,
                              size_hint_y=None, height=dp(22)))
         box.add_widget(t_content)
-        box.add_widget(Label(text='关键词', font_name=_UI_FONT_NAME, color=TEXT_DARK,
+        box.add_widget(Label(text='关键词', font_name=_UI_FONT_NAME, color=TEXT_WHITE,
                              size_hint_y=None, height=dp(22)))
         box.add_widget(t_kw)
         box.add_widget(Label(text='状态(蓝=常驻 绿=关键词 红=禁用) / 位置',
-                             font_name=_UI_FONT_NAME, color=TEXT_DARK,
+                             font_name=_UI_FONT_NAME, color=TEXT_WHITE,
                              size_hint_y=None, height=dp(22)))
         box.add_widget(BoxLayout(size_hint_y=None, height=dp(40),
                                  children=[st_spin, pos_spin]))
-        box.add_widget(Label(text='顺序值', font_name=_UI_FONT_NAME, color=TEXT_DARK,
+        box.add_widget(Label(text='顺序值', font_name=_UI_FONT_NAME, color=TEXT_WHITE,
                              size_hint_y=None, height=dp(22)))
         box.add_widget(t_order)
         btns = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(8))
-        ok = Button(text='保存', font_name=_UI_FONT_NAME, background_color=BLUE, color=TEXT_WHITE)
-        cancel = Button(text='取消', font_name=_UI_FONT_NAME,
+        ok = ModernButton(text='保存', font_name=_UI_FONT_NAME,
+                          background_color=BLUE, color=TEXT_WHITE)
+        cancel = ModernButton(text='取消', font_name=_UI_FONT_NAME,
                         background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
 
         def on_save(_):
@@ -675,26 +768,28 @@ class SettingsScreen(Screen):
         self.build_ui()
 
     def build_ui(self):
-        root = BoxLayout(orientation='vertical')
-        top = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), 0))
+        root = BoxLayout(orientation='vertical', padding=(dp(10), dp(8)), spacing=dp(8))
+        top = SurfaceBox(size_hint_y=None, height=dp(56), padding=(dp(12), dp(6)),
+                         surface_color=CARD)
         top.add_widget(Label(text=_emoji_markup('⚙️ 设置'), markup=_EMOJI_MARKUP_AVAILABLE,
-                             bold=True, color=TEXT_WHITE, font_size=sp(18)))
+                             bold=True, color=TEXT_DARK, font_size=sp(18)))
         root.add_widget(top)
 
-        scroll = ScrollView()
+        scroll = ScrollView(bar_width=dp(4), bar_color=BLUE,
+                            bar_inactive_color=(0.75, 0.78, 0.83, 1))
         form = BoxLayout(orientation='vertical', spacing=dp(10), padding=(dp(14), dp(12)),
                          size_hint_y=None)
         form.bind(minimum_height=form.setter('height'))
 
         def field(label, key, hint='', multiline=False):
-            form.add_widget(Label(text=label, color=TEXT_WHITE, size_hint_y=None, height=dp(22),
+            form.add_widget(Label(text=label, color=TEXT_DARK, size_hint_y=None, height=dp(22),
                                   halign='left'))
             if multiline:
-                ti = TextInput(hint_text=hint, multiline=True, height=dp(90),
+                ti = ModernTextInput(hint_text=hint, multiline=True, height=dp(90),
                                size_hint_y=None, background_color=(1, 1, 1, 1),
                                foreground_color=TEXT_DARK)
             else:
-                ti = TextInput(hint_text=hint, multiline=False, height=dp(44),
+                ti = ModernTextInput(hint_text=hint, multiline=False, height=dp(44),
                                size_hint_y=None, background_color=(1, 1, 1, 1),
                                foreground_color=TEXT_DARK)
             form.add_widget(ti)
@@ -711,26 +806,26 @@ class SettingsScreen(Screen):
         field('前置提示词 raw_prefix', 'raw_prefix', multiline=True)
         field('温度（0~2）', 'temperature', '0.8')
 
-        form.add_widget(Label(text='采样/功能开关', color=TEXT_WHITE, size_hint_y=None,
+        form.add_widget(Label(text='采样/功能开关', color=TEXT_DARK, size_hint_y=None,
                               height=dp(22), bold=True))
         self.ck_thinking = CheckBox(active=False)
         self.ck_bm25 = CheckBox(active=True)
         self.ck_search = CheckBox(active=True)
         self.ck_delai = CheckBox(active=False)
         row = BoxLayout(size_hint_y=None, height=dp(40))
-        row.add_widget(Label(text='先想再答', color=TEXT_WHITE))
+        row.add_widget(Label(text='先想再答', color=TEXT_DARK))
         row.add_widget(self.ck_thinking)
-        row.add_widget(Label(text='BM25记忆', color=TEXT_WHITE))
+        row.add_widget(Label(text='BM25记忆', color=TEXT_DARK))
         row.add_widget(self.ck_bm25)
-        row.add_widget(Label(text='翻旧账工具', color=TEXT_WHITE))
+        row.add_widget(Label(text='翻旧账工具', color=TEXT_DARK))
         row.add_widget(self.ck_search)
         form.add_widget(row)
         row2 = BoxLayout(size_hint_y=None, height=dp(40))
-        row2.add_widget(Label(text='去AI味', color=TEXT_WHITE))
+        row2.add_widget(Label(text='去AI味', color=TEXT_DARK))
         row2.add_widget(self.ck_delai)
         form.add_widget(row2)
 
-        save_btn = Button(text=_emoji_markup('💾 保存设置'), markup=_EMOJI_MARKUP_AVAILABLE,
+        save_btn = ModernButton(text=_emoji_markup('💾 保存设置'), markup=_EMOJI_MARKUP_AVAILABLE,
                           size_hint_y=None, height=dp(50),
                           background_color=BLUE, color=TEXT_WHITE)
         save_btn.bind(on_release=lambda *_: self.save_cfg())
@@ -770,6 +865,7 @@ class SettingsScreen(Screen):
         if App.get_running_app() and hasattr(App.get_running_app(), 'chat'):
             App.get_running_app().chat.hm.cfg = cfg
         popup = Popup(title='已保存', title_font=_UI_FONT_NAME,
+                      background_color=(0.16, 0.18, 0.22, 1),
                       content=Label(text='设置已保存，重启生效。',
                                     font_name=_UI_FONT_NAME,
                                     color=TEXT_WHITE,
@@ -799,13 +895,14 @@ class PetApp(App):
 
         root = BoxLayout(orientation='vertical')
         root.add_widget(sm)
-        nav = BoxLayout(size_hint_y=None, height=dp(56))
+        nav = SurfaceBox(size_hint_y=None, height=dp(60), padding=(dp(4), dp(4)),
+                         spacing=dp(6), surface_color=CARD)
 
         def go(name):
             sm.current = name
 
         for text, name in (('💬 聊天', 'chat'), ('📚 世界书', 'world'), ('⚙️ 设置', 'settings')):
-            b = Button(text=_emoji_markup(text), markup=_EMOJI_MARKUP_AVAILABLE,
+            b = ModernButton(text=_emoji_markup(text), markup=_EMOJI_MARKUP_AVAILABLE,
                        background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
             b.bind(on_release=lambda w, n=name: go(n))
             nav.add_widget(b)

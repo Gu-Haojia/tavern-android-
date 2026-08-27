@@ -705,8 +705,9 @@ def _ssl_context():
 def _stream_once(messages, cfg, tools, on_token=None, on_reasoning=None):
     base = (cfg.get("base_url") or "").rstrip("/")
     url = base + "/chat/completions"
+    model_name = str(cfg.get("model") or "gpt-3.5-turbo").strip()
     payload = {
-        "model": cfg.get("model") or "gpt-3.5-turbo",
+        "model": model_name,
         "messages": messages,
         "stream": True,
         "temperature": float(cfg.get("temperature", 0.8)),
@@ -716,6 +717,8 @@ def _stream_once(messages, cfg, tools, on_token=None, on_reasoning=None):
     if tools:
         payload["tools"] = tools
         payload["tool_choice"] = "auto"
+        if model_name.lower() == "gpt-5.6-luna":
+            payload["reasoning_effort"] = "none"
     if cfg.get("model_source") != "local":
         payload["stream_options"] = {"include_usage": True}
     data = json.dumps(payload).encode("utf-8")

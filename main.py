@@ -296,13 +296,9 @@ class ChatScreen(Screen):
         self.load_history()
 
     def scroll_to_bottom(self):
-        Clock.schedule_once(lambda *_: self.scroll.scroll_y if hasattr(self.scroll, 'scroll_y')
-                            else None, 0.05)
-        # Kivy ScrollView 用 scroll_to
-        try:
-            self.scroll.scroll_to(self.msg_box.children[-1] if self.msg_box.children else None)
-        except Exception:
-            pass
+        # Kivy BoxLayout.children 按倒序存放，children[-1] 是最老消息。
+        # 直接设为 0 表示 ScrollView 底部，避免发送后跳回历史开头。
+        Clock.schedule_once(lambda *_: setattr(self.scroll, 'scroll_y', 0), 0.05)
 
     # ---------- 发送 ----------
     def send(self):
@@ -682,7 +678,7 @@ class SettingsScreen(Screen):
         root = BoxLayout(orientation='vertical')
         top = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), 0))
         top.add_widget(Label(text=_emoji_markup('⚙️ 设置'), markup=_EMOJI_MARKUP_AVAILABLE,
-                             bold=True, color=TEXT_DARK, font_size=sp(18)))
+                             bold=True, color=TEXT_WHITE, font_size=sp(18)))
         root.add_widget(top)
 
         scroll = ScrollView()
@@ -691,7 +687,7 @@ class SettingsScreen(Screen):
         form.bind(minimum_height=form.setter('height'))
 
         def field(label, key, hint='', multiline=False):
-            form.add_widget(Label(text=label, color=TEXT_DARK, size_hint_y=None, height=dp(22),
+            form.add_widget(Label(text=label, color=TEXT_WHITE, size_hint_y=None, height=dp(22),
                                   halign='left'))
             if multiline:
                 ti = TextInput(hint_text=hint, multiline=True, height=dp(90),
@@ -715,22 +711,22 @@ class SettingsScreen(Screen):
         field('前置提示词 raw_prefix', 'raw_prefix', multiline=True)
         field('温度（0~2）', 'temperature', '0.8')
 
-        form.add_widget(Label(text='采样/功能开关', color=TEXT_DARK, size_hint_y=None,
+        form.add_widget(Label(text='采样/功能开关', color=TEXT_WHITE, size_hint_y=None,
                               height=dp(22), bold=True))
         self.ck_thinking = CheckBox(active=False)
         self.ck_bm25 = CheckBox(active=True)
         self.ck_search = CheckBox(active=True)
         self.ck_delai = CheckBox(active=False)
         row = BoxLayout(size_hint_y=None, height=dp(40))
-        row.add_widget(Label(text='先想再答', color=TEXT_DARK))
+        row.add_widget(Label(text='先想再答', color=TEXT_WHITE))
         row.add_widget(self.ck_thinking)
-        row.add_widget(Label(text='BM25记忆', color=TEXT_DARK))
+        row.add_widget(Label(text='BM25记忆', color=TEXT_WHITE))
         row.add_widget(self.ck_bm25)
-        row.add_widget(Label(text='翻旧账工具', color=TEXT_DARK))
+        row.add_widget(Label(text='翻旧账工具', color=TEXT_WHITE))
         row.add_widget(self.ck_search)
         form.add_widget(row)
         row2 = BoxLayout(size_hint_y=None, height=dp(40))
-        row2.add_widget(Label(text='去AI味', color=TEXT_DARK))
+        row2.add_widget(Label(text='去AI味', color=TEXT_WHITE))
         row2.add_widget(self.ck_delai)
         form.add_widget(row2)
 

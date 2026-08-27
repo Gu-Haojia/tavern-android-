@@ -178,22 +178,27 @@ class SurfaceBox(BoxLayout):
 class ModernButton(Button):
     """Flat rounded button without Kivy's dated square texture."""
 
+    fill_color = ListProperty(CARD)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.fill_color = list(self.background_color)
+        # Button's own rectangle is square; the visible background is our rounded layer.
+        self.background_color = (0, 0, 0, 0)
         self.background_normal = ''
         self.background_down = ''
         self.background_disabled = ''
         with self.canvas.before:
-            self._button_color = Color(rgba=self.background_color)
+            self._button_color = Color(rgba=self.fill_color)
             self._button_rect = RoundedRectangle(
                 pos=self.pos, size=self.size,
                 radius=[(dp(12), dp(12))] * 4)
         self.bind(pos=self._sync_button, size=self._sync_button,
-                  background_color=self._sync_button)
+                  fill_color=self._sync_button)
         self._sync_button()
 
     def _sync_button(self, *_):
-        self._button_color.rgba = self.background_color
+        self._button_color.rgba = self.fill_color
         self._button_rect.pos = self.pos
         self._button_rect.size = self.size
 
@@ -201,21 +206,25 @@ class ModernButton(Button):
 class ModernTextInput(TextInput):
     """Clean rounded text field with the same predictable Android fallback font."""
 
+    fill_color = ListProperty(CARD)
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        self.fill_color = list(self.background_color)
+        self.background_color = (0, 0, 0, 0)
         self.background_normal = ''
         self.background_active = ''
         with self.canvas.before:
-            self._input_color = Color(rgba=self.background_color)
+            self._input_color = Color(rgba=self.fill_color)
             self._input_rect = RoundedRectangle(
                 pos=self.pos, size=self.size,
                 radius=[(dp(10), dp(10))] * 4)
         self.bind(pos=self._sync_input, size=self._sync_input,
-                  background_color=self._sync_input)
+                  fill_color=self._sync_input)
         self._sync_input()
 
     def _sync_input(self, *_):
-        self._input_color.rgba = self.background_color
+        self._input_color.rgba = self.fill_color
         self._input_rect.pos = self.pos
         self._input_rect.size = self.size
 
@@ -499,7 +508,7 @@ class ChatScreen(Screen):
     def refresh_tavern_btn(self):
         on = bool(self.hm and self.hm.cfg.get('tavern_mode'))
         self.tavern_btn.text = _emoji_markup('📖 小说: 开' if on else '📖 小说: 关')
-        self.tavern_btn.background_color = (0.28, 0.55, 1.0, 1) if on else (0.75, 0.78, 0.82, 1)
+        self.tavern_btn.fill_color = (0.28, 0.55, 1.0, 1) if on else (0.75, 0.78, 0.82, 1)
         self.tavern_btn.color = TEXT_WHITE if on else TEXT_DARK
 
     def render_choices(self, ai_text):

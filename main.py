@@ -493,7 +493,8 @@ class ChatScreen(Screen):
             return
         pop = Popup(title='编辑消息', title_font=_UI_FONT_NAME, size_hint=(0.9, 0.6))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
-        t_input = TextInput(text=bubble.raw_text, multiline=True, foreground_color=TEXT_DARK)
+        t_input = TextInput(text=bubble.raw_text, multiline=True, foreground_color=TEXT_DARK,
+                            font_name=_UI_FONT_NAME)
         box.add_widget(t_input)
         btns = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(8))
         ok = Button(text='保存并重新生成', background_color=BLUE, color=TEXT_WHITE)
@@ -601,31 +602,41 @@ class WorldbookScreen(Screen):
 
         content = Popup(title='世界书条目', title_font=_UI_FONT_NAME, size_hint=(0.92, 0.9))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
-        t_title = TextInput(text=e.get('title') or '', hint_text='标题', multiline=False)
+        t_title = TextInput(text=e.get('title') or '', hint_text='标题', multiline=False,
+                            font_name=_UI_FONT_NAME)
         t_content = TextInput(text=e.get('content') or '', hint_text='内容（触发后注入的设定）',
-                              multiline=True)
+                              multiline=True, font_name=_UI_FONT_NAME)
         t_kw = TextInput(text='，'.join(e.get('primary_keywords') or []),
-                         hint_text='关键词（逗号分隔，聊到才触发）', multiline=False)
+                         hint_text='关键词（逗号分隔，聊到才触发）', multiline=False,
+                         font_name=_UI_FONT_NAME)
         t_order = TextInput(text=str(e.get('order', 100)), hint_text='顺序值（越大越靠下越强）',
-                            multiline=False)
-        st_spin = Spinner(text=e.get('status', 'green'), values=('blue', 'green', 'red'))
+                            multiline=False, font_name=_UI_FONT_NAME)
+        st_spin = Spinner(text=e.get('status', 'green'), values=('blue', 'green', 'red'),
+                          font_name=_UI_FONT_NAME)
         pos_spin = Spinner(text=e.get('position', 'before_char'),
-                           values=('before_char', 'after_char', 'after_an', 'depth'))
-        box.add_widget(Label(text='标题', color=TEXT_DARK, size_hint_y=None, height=dp(22)))
+                           values=('before_char', 'after_char', 'after_an', 'depth'),
+                           font_name=_UI_FONT_NAME)
+        box.add_widget(Label(text='标题', font_name=_UI_FONT_NAME, color=TEXT_DARK,
+                             size_hint_y=None, height=dp(22)))
         box.add_widget(t_title)
-        box.add_widget(Label(text='内容', color=TEXT_DARK, size_hint_y=None, height=dp(22)))
+        box.add_widget(Label(text='内容', font_name=_UI_FONT_NAME, color=TEXT_DARK,
+                             size_hint_y=None, height=dp(22)))
         box.add_widget(t_content)
-        box.add_widget(Label(text='关键词', color=TEXT_DARK, size_hint_y=None, height=dp(22)))
+        box.add_widget(Label(text='关键词', font_name=_UI_FONT_NAME, color=TEXT_DARK,
+                             size_hint_y=None, height=dp(22)))
         box.add_widget(t_kw)
-        box.add_widget(Label(text='状态(蓝=常驻 绿=关键词 红=禁用) / 位置', color=TEXT_DARK,
+        box.add_widget(Label(text='状态(蓝=常驻 绿=关键词 红=禁用) / 位置',
+                             font_name=_UI_FONT_NAME, color=TEXT_DARK,
                              size_hint_y=None, height=dp(22)))
         box.add_widget(BoxLayout(size_hint_y=None, height=dp(40),
                                  children=[st_spin, pos_spin]))
-        box.add_widget(Label(text='顺序值', color=TEXT_DARK, size_hint_y=None, height=dp(22)))
+        box.add_widget(Label(text='顺序值', font_name=_UI_FONT_NAME, color=TEXT_DARK,
+                             size_hint_y=None, height=dp(22)))
         box.add_widget(t_order)
         btns = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(8))
-        ok = Button(text='保存', background_color=BLUE, color=TEXT_WHITE)
-        cancel = Button(text='取消', background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
+        ok = Button(text='保存', font_name=_UI_FONT_NAME, background_color=BLUE, color=TEXT_WHITE)
+        cancel = Button(text='取消', font_name=_UI_FONT_NAME,
+                        background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
 
         def on_save(_):
             e['title'] = t_title.text.strip() or '未命名条目'

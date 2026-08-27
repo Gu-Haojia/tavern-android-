@@ -36,8 +36,8 @@ jobs:
           python -m pip install --upgrade pip==26.1.2
           python -m pip install --upgrade setuptools==69.0.2 wheel==0.42.0
           python -m pip install \
-            buildozer==1.5.0 \
-            cython==0.29.36
+            buildozer \
+            cython==0.29.34
 
       - name: Cache Buildozer and Android dependencies
         uses: actions/cache@v4
@@ -52,8 +52,8 @@ jobs:
 
       - name: Build debug APK
         run: |
-          # GitHub runner 预装 NDK 27c，但 p4a master 与 NDK 25b 最稳；
-          # 去掉环境变量强制 buildozer 按 buildozer.spec 的 android.ndk=25b 自行下载。
+          # GitHub runner 预装 NDK 27c，但官方验证组合用 NDK 29（buildozer.spec 已设 android.ndk=29）。
+          # 去掉预装 NDK 的环境变量，强制 buildozer 按 spec 自行下载 NDK 29。
           unset ANDROID_NDK_HOME
           unset ANDROID_NDK_ROOT
           buildozer -v android debug

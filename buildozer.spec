@@ -13,11 +13,14 @@ source.exclude_dirs = tests,bin,.git,.github,.buildozer,venv,.venv
 
 # ai_core.py 只使用标准库；Kivy 是唯一的 UI 框架依赖。
 # distro 和 charset_normalizer 是运行时普通 Python 包，需显式列出。
-# Python 版本必须同时钉死 python3 和 hostpython3：p4a 会检查两者版本一致，
-# 只钉一个另一个会默认走 3.14.2，导致 "python3 should have same version as hostpython3" 报错。
-requirements = python3==3.12.14,hostpython3==3.12.14,kivy,distro,charset_normalizer
+# Python 版本必须 python3 和 hostpython3 一起钉，两者必须完全一致（p4a 强制检查）。
+# 选 3.11.11 的原因：
+#   - 3.12.x 在 NDK 25b 上 grpmodule.c 编译失败（setgrent/getgrent/endgrent 隐式声明被 -Werror 升级为致命错误），
+#     p4a master 的 python3 recipe 对 3.12 无对应补丁；3.11 的 grpmodule.c 有 HAVE_SETGRENT 守卫，是 p4a 最稳组合。
+#   - 3.14.2（p4a 默认）会触发 hostpython3 3.14 ensurepip 的 BuildDependencyInstallError，不可用。
+requirements = python3==3.11.11,hostpython3==3.11.11,kivy,distro,charset_normalizer
 
-# Kivy 应用使用 SDL2。sd12 不是合法的 bootstrap，也不是 Python 3.12 的简称。
+# Kivy 应用使用 SDL2。合法的 p4a bootstrap 只有 sdl2 / service_only / webview / qt 等；bootstrap 名不控制 Python 版本。
 p4a.bootstrap = sdl2
 
 # 使用 p4a master 分支。配合上面的 Python recipe 版本可避免跟随默认版本漂移。
@@ -34,9 +37,6 @@ android.minapi = 24
 android.ndk = 25b
 android.archs = arm64-v8a
 android.accept_sdk_license = True
-
-# debug 命令输出 APK，而不是 AAB。文件名由 Buildozer/p4a 自动生成。
-android.debug_artifact = apk
 
 # 可选资源：文件存在后再取消注释。
 # icon.filename = %(source.dir)s/icons/icon.png

@@ -13,9 +13,9 @@ source.exclude_dirs = tests,bin,.git,.github,.buildozer,venv,.venv
 
 # ai_core.py 只使用标准库；Kivy 是唯一的 UI 框架依赖。
 # distro 和 charset_normalizer 是运行时普通 Python 包，需显式列出。
-# Python 版本通过 p4a recipe 版本钉死。python3 和 hostpython3 必须保持一致，
-# 否则目标 Python 与构建阶段 Python 的版本检查会失败。
-requirements = python3==3.12.14,hostpython3==3.12.14,kivy,distro,charset_normalizer
+# Python 版本通过 python3 recipe 版本钉死；hostpython3 由 python3 recipe 内部处理，
+# 不需要也不应该显式写进 requirements。
+requirements = python3==3.12.14,kivy,distro,charset_normalizer
 
 # Kivy 应用使用 SDL2。sd12 不是合法的 bootstrap，也不是 Python 3.12 的简称。
 p4a.bootstrap = sdl2

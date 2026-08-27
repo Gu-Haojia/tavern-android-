@@ -6,7 +6,35 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install deps
-        run: sudo apt-get update -y && sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libff[...]
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            git \
+            zip \
+            unzip \
+            openjdk-17-jdk \
+            python3-pip \
+            autoconf \
+            libtool \
+            pkg-config \
+            zlib1g-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            libtinfo5 \
+            cmake \
+            libffi-dev \
+            libssl-dev \
+            libjpeg-dev \
+            libfreetype6-dev \
+            libgl1-mesa-dev \
+            libgles2-mesa-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxext-dev \
+            libxi-dev \
+            build-essential
       - name: Ensure pip < 24 and upgrade setuptools/wheel
         run: python3 -m pip install --upgrade "pip<24" setuptools wheel
       - name: Install buildozer with compatible dependencies

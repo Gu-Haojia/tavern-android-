@@ -5,12 +5,12 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-      
+
       - name: Install system dependencies
         run: |
           sudo apt-get update -y
@@ -25,22 +25,21 @@ jobs:
             libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxext-dev libxi-dev \
             build-essential
-      
+
       - name: Clean pip and install compatible versions
         run: |
           python3 -m pip install --upgrade pip==23.3.2
           python3 -m pip install --upgrade setuptools==68.2.2 wheel==0.41.3
-      
-      - name: Install buildozer and dependencies with pinned versions
+
+      - name: Install buildozer and cython with pinned versions
         run: |
           python3 -m pip install \
-            'buildozer==1.4.6' \
-            'cython==0.29.36' \
-            'pythonforandroid==0.52.0'
-      
+            'buildozer==1.5.0' \
+            'cython==0.29.36'
+
       - name: Build APK
-        run: buildozer -v android debug
-      
+        run: yes | buildozer -v android debug
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         if: success()

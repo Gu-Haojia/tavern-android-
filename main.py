@@ -74,7 +74,12 @@ def _bubble(text, is_user):
         padding=(dp(14), dp(10)),
     )
     btn.text_size = (dp(280), None)
-    btn.bind(size=lambda w, _: setattr(w, 'height', max(dp(44), w.text_size[1] + dp(24))))
+
+    def update_bubble_height(widget, _):
+        text_height = widget.texture_size[1] or 0
+        widget.height = max(dp(44), text_height + dp(24))
+
+    btn.bind(texture_size=update_bubble_height)
     return btn
 
 

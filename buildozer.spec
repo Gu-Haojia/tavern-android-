@@ -12,7 +12,7 @@ package.domain = org.example
 
 # 源文件入口
 source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,ttf,txt,json
+source.include_exts = py,png,jpg,kv,atlas,ttf,otf,txt,json
 source.exclude_dirs = tests, bin, .git, .github, .buildozer
 
 # ai_core 只使用 Python 标准库，UI 只依赖 Kivy。

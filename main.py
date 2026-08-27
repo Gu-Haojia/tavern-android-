@@ -4,10 +4,13 @@ tavern-android / main.py —— 酒馆版手机端（Kivy）。
 聊天 + 互动小说 + 世界书管理 + 设置，全部复用 ai_core 纯内核。
 打包：buildozer android debug（见 README + GitHub Actions）。
 """
+import os
 import threading
 import time
 
 from kivy.app import App
+from kivy.core.text import LabelBase
+from kivy.lang import Builder
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.scrollview import ScrollView
@@ -23,6 +26,28 @@ from kivy.clock import Clock
 from kivy.metrics import dp, sp
 
 import ai_core
+
+
+# Kivy/SDL2_ttf 不会稳定地从 MuMu 或真机系统字体回退到中文字体。
+# 将 SIL OFL 许可的 Noto Sans CJK 简体中文字体随 APK 打包，并设为文本控件的统一字体。
+_FONT_NAME = 'NotoSansCJKsc'
+_FONT_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'assets',
+    'NotoSansCJKsc-Regular.otf',
+)
+if os.path.isfile(_FONT_PATH):
+    LabelBase.register(name=_FONT_NAME, fn_regular=_FONT_PATH)
+    Builder.load_string("""
+<Label>:
+    font_name: 'NotoSansCJKsc'
+<Button>:
+    font_name: 'NotoSansCJKsc'
+<TextInput>:
+    font_name: 'NotoSansCJKsc'
+<Spinner>:
+    font_name: 'NotoSansCJKsc'
+""")
 
 # 主题色
 BLUE = (0.18, 0.43, 1.0, 1.0)

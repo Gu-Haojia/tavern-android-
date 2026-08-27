@@ -5,12 +5,14 @@ tavern-android / main.py —— 酒馆版手机端（Kivy）。
 打包：buildozer android debug（见 README + GitHub Actions）。
 """
 import os
+import re
 import threading
 import time
 
 from kivy.app import App
 from kivy.core.text import LabelBase
 from kivy.lang import Builder
+from kivy.utils import escape_markup
 from kivy.uix.screenmanager import ScreenManager, Screen
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.scrollview import ScrollView
@@ -36,8 +38,46 @@ _FONT_PATH = os.path.join(
     'assets',
     'NotoSansCJKsc-Regular.otf',
 )
-if os.path.isfile(_FONT_PATH):
-    LabelBase.register(name=_FONT_NAME, fn_regular=_FONT_PATH)
+_EMOJI_FONT_NAME = 'NotoColorEmoji'
+_EMOJI_FONT_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'assets',
+    'NotoColorEmoji_WindowsCompatible.ttf',
+)
+_FONT_AVAILABLE = False
+_EMOJI_FONT_AVAILABLE = False
+try:
+    if os.path.isfile(_FONT_PATH):
+        LabelBase.register(name=_FONT_NAME, fn_regular=_FONT_PATH)
+        _FONT_AVAILABLE = True
+except Exception as e:
+    print('中文字体加载失败，回退到 Kivy 默认字体:', e)
+try:
+    if os.path.isfile(_EMOJI_FONT_PATH):
+        LabelBase.register(name=_EMOJI_FONT_NAME, fn_regular=_EMOJI_FONT_PATH)
+        _EMOJI_FONT_AVAILABLE = True
+except Exception as e:
+    print('emoji 字体加载失败，回退到主字体:', e)
+
+_EMOJI_RUN_RE = re.compile(
+    r'([\U0001F000-\U0001FAFF\u2300-\u23FF\u2600-\u27BF\u2B00-\u2BFF'
+    r'\u200D\u20E3\uFE0F\U000E0020-\U000E007F]+)'
+)
+
+
+def _emoji_markup(text):
+    """Wrap emoji runs in the bundled emoji font, with a safe plain-text fallback."""
+    text = '' if text is None else str(text)
+    if not _EMOJI_FONT_AVAILABLE:
+        return text
+    escaped = escape_markup(text)
+    return _EMOJI_RUN_RE.sub(
+        lambda match: '[font=%s]%s[/font]' % (_EMOJI_FONT_NAME, match.group(0)),
+        escaped,
+    )
+
+
+if _FONT_AVAILABLE:
     Builder.load_string("""
 <Label>:
     font_name: 'NotoSansCJKsc'
@@ -86,8 +126,10 @@ class BubbleButton(Button):
 
 def _bubble(text, is_user):
     """生成一条聊天气泡（BubbleButton 充当圆角气泡，长按弹操作菜单）。"""
+    raw_text = '' if text is None else str(text)
     btn = BubbleButton(
-        text=text,
+        text=_emoji_markup(raw_text),
+        markup=_EMOJI_FONT_AVAILABLE,
         size_hint=(0.78, None),
         # NumericProperty 不接受 None；先给气泡一个最小高度，随后按文本高度调整。
         height=dp(44),
@@ -105,7 +147,14 @@ def _bubble(text, is_user):
         widget.height = max(dp(44), text_height + dp(24))
 
     btn.bind(texture_size=update_bubble_height)
+    btn.raw_text = raw_text
     return btn
+
+
+def _set_bubble_text(widget, text):
+    """Set display text while keeping the original text for editing and persistence."""
+    widget.raw_text = '' if text is None else str(text)
+    widget.text = _emoji_markup(widget.raw_text)
 
 
 class ChatScreen(Screen):
@@ -122,14 +171,17 @@ class ChatScreen(Screen):
         root = BoxLayout(orientation='vertical')
         # 顶部栏：标题 + 小说开关 + 新对话
         top = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), 0))
-        self.title_lbl = Label(text='🍻 酒馆', size_hint_x=0.5, halign='left',
+        self.title_lbl = Label(text=_emoji_markup('🍻 酒馆'), markup=_EMOJI_FONT_AVAILABLE,
+                               size_hint_x=0.5, halign='left',
                                color=TEXT_DARK, bold=True, font_size=sp(18))
         top.add_widget(self.title_lbl)
-        self.tavern_btn = Button(text='📖 小说: 关', size_hint_x=None, width=dp(110),
+        self.tavern_btn = Button(text=_emoji_markup('📖 小说: 关'), markup=_EMOJI_FONT_AVAILABLE,
+                                 size_hint_x=None, width=dp(110),
                                  background_color=(0.75, 0.78, 0.82, 1), color=TEXT_DARK)
         self.tavern_btn.bind(on_release=lambda *_: self.toggle_tavern())
         top.add_widget(self.tavern_btn)
-        regen_btn = Button(text='🔄', size_hint_x=None, width=dp(44),
+        regen_btn = Button(text=_emoji_markup('🔄'), markup=_EMOJI_FONT_AVAILABLE,
+                           size_hint_x=None, width=dp(44),
                            background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
         regen_btn.bind(on_release=lambda *_: self.regen())
         top.add_widget(regen_btn)
@@ -252,14 +304,14 @@ class ChatScreen(Screen):
     def append_stream(self, tok):
         if self.cur_bubble is None:
             self.cur_bubble = self.add_bubble('', False)
-        self.cur_bubble.text += tok
+        _set_bubble_text(self.cur_bubble, self.cur_bubble.raw_text + tok)
 
     def on_finished(self, ai_text, usage):
         self.busy = False
         self.set_input_enabled(True)
         # 若流式已渲染则回写完整文本（保证与存档一致）
         if self.cur_bubble is not None:
-            self.cur_bubble.text = ai_text or self.cur_bubble.text
+            _set_bubble_text(self.cur_bubble, ai_text or self.cur_bubble.raw_text)
         else:
             self.add_bubble(ai_text or '(空回复)', False)
         self.cur_bubble = None
@@ -288,7 +340,8 @@ class ChatScreen(Screen):
         rtext = '\n'.join(parts).strip()
         if not rtext:
             return
-        tip = Label(text='💭 ' + rtext, font_size=sp(11), color=(0.55, 0.57, 0.63, 1),
+        tip = Label(text=_emoji_markup('💭 ' + rtext), markup=_EMOJI_FONT_AVAILABLE,
+                    font_size=sp(11), color=(0.55, 0.57, 0.63, 1),
                     halign='left', valign='top', size_hint=(0.78, None),
                     text_size=(dp(280), None), padding=(dp(16), 0))
         tip.bind(size=lambda w, _: setattr(w, 'height', w.text_size[1] + dp(8)))
@@ -311,7 +364,7 @@ class ChatScreen(Screen):
 
     def refresh_tavern_btn(self):
         on = bool(self.hm and self.hm.cfg.get('tavern_mode'))
-        self.tavern_btn.text = '📖 小说: 开' if on else '📖 小说: 关'
+        self.tavern_btn.text = _emoji_markup('📖 小说: 开' if on else '📖 小说: 关')
         self.tavern_btn.background_color = (0.28, 0.55, 1.0, 1) if on else (0.75, 0.78, 0.82, 1)
         self.tavern_btn.color = TEXT_WHITE if on else TEXT_DARK
 
@@ -322,7 +375,8 @@ class ChatScreen(Screen):
         if not choices:
             return
         for c in choices:
-            b = Button(text='▶ ' + c, size_hint_y=None, height=dp(42),
+            b = Button(text=_emoji_markup('▶ ' + c), markup=_EMOJI_FONT_AVAILABLE,
+                       size_hint_y=None, height=dp(42),
                        background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK,
                        halign='left', padding=(dp(10), 0))
             b.bind(on_release=lambda w, choice=c: self.choose(choice))
@@ -363,16 +417,17 @@ class ChatScreen(Screen):
         pop = Popup(title='气泡操作', size_hint=(0.8, None), height=dp(240))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
         if is_user:
-            b_edit = Button(text='✏️ 编辑并重新生成',
+            b_edit = Button(text=_emoji_markup('✏️ 编辑并重新生成'), markup=_EMOJI_FONT_AVAILABLE,
                             background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
             b_edit.bind(on_release=lambda *_: (pop.dismiss(), self.edit_bubble(bubble)))
             box.add_widget(b_edit)
         else:
-            b_regen = Button(text='🔄 重新生成',
+            b_regen = Button(text=_emoji_markup('🔄 重新生成'), markup=_EMOJI_FONT_AVAILABLE,
                              background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
             b_regen.bind(on_release=lambda *_: (pop.dismiss(), self.regen()))
             box.add_widget(b_regen)
-        b_del = Button(text='🗑 删除', background_color=(0.9, 0.6, 0.6, 1), color=TEXT_WHITE)
+        b_del = Button(text=_emoji_markup('🗑 删除'), markup=_EMOJI_FONT_AVAILABLE,
+                       background_color=(0.9, 0.6, 0.6, 1), color=TEXT_WHITE)
         b_del.bind(on_release=lambda *_: (pop.dismiss(), self.delete_bubble(bubble, is_user)))
         box.add_widget(b_del)
         b_cancel = Button(text='取消', background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
@@ -383,12 +438,12 @@ class ChatScreen(Screen):
 
     def edit_bubble(self, bubble):
         """编辑用户消息：改内容 → 其后的对话作废 → 自动重新生成。"""
-        idx = self._find_msg_index(bubble.text, True)
+        idx = self._find_msg_index(bubble.raw_text, True)
         if idx is None:
             return
         pop = Popup(title='编辑消息', size_hint=(0.9, 0.6))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
-        t_input = TextInput(text=bubble.text, multiline=True, foreground_color=TEXT_DARK)
+        t_input = TextInput(text=bubble.raw_text, multiline=True, foreground_color=TEXT_DARK)
         box.add_widget(t_input)
         btns = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(8))
         ok = Button(text='保存并重新生成', background_color=BLUE, color=TEXT_WHITE)
@@ -416,7 +471,7 @@ class ChatScreen(Screen):
         pop.open()
 
     def delete_bubble(self, bubble, is_user):
-        idx = self._find_msg_index(bubble.text, is_user)
+        idx = self._find_msg_index(bubble.raw_text, is_user)
         if idx is None:
             return
         self.hm.messages.pop(idx)
@@ -444,7 +499,8 @@ class WorldbookScreen(Screen):
     def build_ui(self):
         root = BoxLayout(orientation='vertical')
         top = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), 0))
-        top.add_widget(Label(text='📚 世界书', bold=True, color=TEXT_DARK, font_size=sp(18)))
+        top.add_widget(Label(text=_emoji_markup('📚 世界书'), markup=_EMOJI_FONT_AVAILABLE,
+                             bold=True, color=TEXT_DARK, font_size=sp(18)))
         root.add_widget(top)
 
         self.list_scroll = ScrollView()
@@ -564,7 +620,8 @@ class SettingsScreen(Screen):
     def build_ui(self):
         root = BoxLayout(orientation='vertical')
         top = BoxLayout(size_hint_y=None, height=dp(52), padding=(dp(10), 0))
-        top.add_widget(Label(text='⚙️ 设置', bold=True, color=TEXT_DARK, font_size=sp(18)))
+        top.add_widget(Label(text=_emoji_markup('⚙️ 设置'), markup=_EMOJI_FONT_AVAILABLE,
+                             bold=True, color=TEXT_DARK, font_size=sp(18)))
         root.add_widget(top)
 
         scroll = ScrollView()
@@ -616,7 +673,8 @@ class SettingsScreen(Screen):
         row2.add_widget(self.ck_delai)
         form.add_widget(row2)
 
-        save_btn = Button(text='💾 保存设置', size_hint_y=None, height=dp(50),
+        save_btn = Button(text=_emoji_markup('💾 保存设置'), markup=_EMOJI_FONT_AVAILABLE,
+                          size_hint_y=None, height=dp(50),
                           background_color=BLUE, color=TEXT_WHITE)
         save_btn.bind(on_release=lambda *_: self.save_cfg())
         form.add_widget(save_btn)
@@ -687,7 +745,8 @@ class PetApp(App):
             sm.current = name
 
         for text, name in (('💬 聊天', 'chat'), ('📚 世界书', 'world'), ('⚙️ 设置', 'settings')):
-            b = Button(text=text, background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
+            b = Button(text=_emoji_markup(text), markup=_EMOJI_FONT_AVAILABLE,
+                       background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
             b.bind(on_release=lambda w, n=name: go(n))
             nav.add_widget(b)
         root.add_widget(nav)

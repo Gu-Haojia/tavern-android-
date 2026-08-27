@@ -33,7 +33,8 @@ jobs:
 
       - name: Install Python build tools
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip==26.1.2
+          python -m pip install --upgrade setuptools==69.0.2 wheel==0.42.0
           python -m pip install \
             buildozer==1.5.0 \
             cython==0.29.36
@@ -50,7 +51,12 @@ jobs:
             buildozer-${{ runner.os }}-
 
       - name: Build debug APK
-        run: buildozer -v android debug
+        run: |
+          # GitHub runner 预装 NDK 27c，但 p4a master 与 NDK 25b 最稳；
+          # 去掉环境变量强制 buildozer 按 buildozer.spec 的 android.ndk=25b 自行下载。
+          unset ANDROID_NDK_HOME
+          unset ANDROID_NDK_ROOT
+          buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

@@ -403,10 +403,10 @@ class ChatScreen(Screen):
             color=PRIMARY_DARK, font_size=sp(12))
         self.tavern_btn.bind(on_release=lambda *_: self.toggle_tavern())
         top.add_widget(self.tavern_btn)
-        regen_btn = ModernButton(text=_emoji_markup('↻'), markup=_EMOJI_MARKUP_AVAILABLE,
+        regen_btn = ModernButton(text='重试',
                                  size_hint_x=None, width=dp(42),
                                  background_color=FIELD_BG, color=TEXT_DARK,
-                                 font_size=sp(19))
+                                 font_size=sp(12))
         regen_btn.bind(on_release=lambda *_: self.regen())
         top.add_widget(regen_btn)
         new_btn = ModernButton(text='＋', size_hint_x=None, width=dp(42),
@@ -461,8 +461,7 @@ class ChatScreen(Screen):
                                padding=(dp(14), dp(11)))
         self.input.bind(on_text_validate=lambda *_: self.send())
         bottom.add_widget(self.input)
-        self.send_btn = ModernButton(text=_emoji_markup('发送 ➤'),
-                                     markup=_EMOJI_MARKUP_AVAILABLE,
+        self.send_btn = ModernButton(text='发送',
                                      size_hint_x=0.22, background_color=PRIMARY,
                                      color=TEXT_WHITE, font_size=sp(13))
         self.send_btn.bind(on_release=lambda *_: self.send())
@@ -551,7 +550,7 @@ class ChatScreen(Screen):
         self.input.opacity = 1.0
         if hasattr(self, 'send_btn'):
             self.send_btn.disabled = not enabled
-            self.send_btn.text = _emoji_markup('发送 ➤' if enabled else '回复中…')
+            self.send_btn.text = '发送' if enabled else '生成中…'
 
     def _run(self, text, append_user=True):
         try:
@@ -662,7 +661,7 @@ class ChatScreen(Screen):
                                            font_size=sp(12), size_hint_y=None,
                                            height=dp(24)))
         for c in choices:
-            b = ModernButton(text=_emoji_markup('▶ ' + c), markup=_EMOJI_MARKUP_AVAILABLE,
+            b = ModernButton(text='  ' + c,
                        size_hint_y=None, height=dp(42),
                        background_color=PRIMARY_SOFT, color=PRIMARY_DARK,
                        halign='left', padding=(dp(12), 0), font_size=sp(13))
@@ -1111,8 +1110,7 @@ class SettingsScreen(Screen):
                               spacing=dp(8), surface_color=CARD, border_color=DIVIDER)
         self.save_status = _label('修改只保存在当前设备', color=MUTED, font_size=sp(11))
         save_bar.add_widget(self.save_status)
-        save_btn = ModernButton(text=_emoji_markup('保存设置 ➤'),
-                                markup=_EMOJI_MARKUP_AVAILABLE,
+        save_btn = ModernButton(text='保存设置',
                                 size_hint_x=None, width=dp(112),
                                 background_color=PRIMARY, color=TEXT_WHITE,
                                 font_size=sp(13))

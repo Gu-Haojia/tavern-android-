@@ -16,9 +16,37 @@ import threading
 import urllib.request
 
 # --------------------------------------------------------------------------- #
-# 路径：手机端（Kivy/Android）~/ 指向 app 私有可写目录；桌面测试时指向用户目录
+# 路径：Android 使用 python-for-android 提供的 app 私有目录；桌面测试时指向用户目录
 # --------------------------------------------------------------------------- #
-APP_DIR = os.path.join(os.path.expanduser("~"), ".tavern_pet")
+
+
+def _default_app_dir():
+    """Return a writable per-app directory on Android, with a desktop fallback.
+
+    Android does not guarantee that ``expanduser("~")`` is writable.  On the
+    MuMu device it resolves to ``/data``, which caused the first screen to
+    crash when HistoryManager tried to create ``/data/.tavern_pet``.
+    """
+    try:
+        from android.storage import app_storage_path
+
+        base_dir = app_storage_path()
+        if base_dir:
+            return os.path.join(base_dir, ".tavern_pet")
+    except Exception:
+        # The android module is unavailable during desktop development/tests,
+        # and older python-for-android versions may not expose this helper.
+        pass
+
+    # python-for-android exposes this path in the environment as a fallback.
+    base_dir = os.environ.get("ANDROID_APP_PATH")
+    if base_dir:
+        return os.path.join(base_dir, ".tavern_pet")
+
+    return os.path.join(os.path.expanduser("~"), ".tavern_pet")
+
+
+APP_DIR = _default_app_dir()
 HISTORY_DIR = os.path.join(APP_DIR, "history")
 WORLDBOOK_DIR = os.path.join(APP_DIR, "worldbooks")
 SUMMARY_FILE = os.path.join(HISTORY_DIR, "summaries.json")

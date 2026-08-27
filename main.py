@@ -64,7 +64,8 @@ def _bubble(text, is_user):
     btn = BubbleButton(
         text=text,
         size_hint=(0.78, None),
-        height=None,
+        # NumericProperty 不接受 None；先给气泡一个最小高度，随后按文本高度调整。
+        height=dp(44),
         halign='left' if not is_user else 'right',
         valign='middle',
         text_size=(None, None),

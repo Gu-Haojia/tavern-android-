@@ -15,10 +15,9 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ttf,otf,txt,json
 source.exclude_dirs = tests, bin, .git, .github, .buildozer
 
-# ai_core 只使用 Python 标准库，UI 只依赖 Kivy。
-# 不要添加未使用的普通 pip 包，否则 p4a 会进入额外的
-# pure-Python 包安装阶段，容易受目标 Python 内置 pip 版本影响。
-requirements = python3,kivy
+# certifi 将 Mozilla CA 根证书随 APK 打包，避免 Android 内置 Python
+# OpenSSL 找不到系统 CA；ai_core 仍会回退到平台证书库。
+requirements = python3,kivy,certifi==2026.7.22
 
 # 固定到包含 Android wheel 安装修复的 p4a develop 提交，避免分支后续漂移。
 p4a.branch = develop

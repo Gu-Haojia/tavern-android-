@@ -85,6 +85,8 @@ try:
 except Exception as e:
     print('Symbols 字体加载失败，回退到主字体:', e)
 
+_UI_FONT_NAME = _FONT_NAME if _FONT_AVAILABLE else 'Roboto'
+
 _EMOJI_MARKUP_AVAILABLE = (
     _EMOJI_FONT_AVAILABLE or _SYMBOLS2_FONT_AVAILABLE or _SYMBOLS_FONT_AVAILABLE
 )
@@ -132,6 +134,8 @@ if _FONT_AVAILABLE:
     font_name: 'NotoSansCJKsc'
 <Spinner>:
     font_name: 'NotoSansCJKsc'
+<Popup>:
+    title_font: 'NotoSansCJKsc'
 """)
 
 # 主题色
@@ -459,7 +463,8 @@ class ChatScreen(Screen):
     def show_bubble_menu(self, bubble, is_user):
         if self.busy or not self.hm:
             return
-        pop = Popup(title='气泡操作', size_hint=(0.8, None), height=dp(240))
+        pop = Popup(title='气泡操作', title_font=_UI_FONT_NAME,
+                    size_hint=(0.8, None), height=dp(240))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
         if is_user:
             b_edit = Button(text=_emoji_markup('✏️ 编辑并重新生成'), markup=_EMOJI_MARKUP_AVAILABLE,
@@ -486,7 +491,7 @@ class ChatScreen(Screen):
         idx = self._find_msg_index(bubble.raw_text, True)
         if idx is None:
             return
-        pop = Popup(title='编辑消息', size_hint=(0.9, 0.6))
+        pop = Popup(title='编辑消息', title_font=_UI_FONT_NAME, size_hint=(0.9, 0.6))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
         t_input = TextInput(text=bubble.raw_text, multiline=True, foreground_color=TEXT_DARK)
         box.add_widget(t_input)
@@ -594,7 +599,7 @@ class WorldbookScreen(Screen):
                 wb = books[0]
         e = dict(entry or ai_core.default_entry())
 
-        content = Popup(title='世界书条目', size_hint=(0.92, 0.9))
+        content = Popup(title='世界书条目', title_font=_UI_FONT_NAME, size_hint=(0.92, 0.9))
         box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
         t_title = TextInput(text=e.get('title') or '', hint_text='标题', multiline=False)
         t_content = TextInput(text=e.get('content') or '', hint_text='内容（触发后注入的设定）',
@@ -757,8 +762,11 @@ class SettingsScreen(Screen):
         ai_core.save_config(cfg)
         if App.get_running_app() and hasattr(App.get_running_app(), 'chat'):
             App.get_running_app().chat.hm.cfg = cfg
-        popup = Popup(title='已保存', content=Label(text='设置已保存，重启生效。',
-                                                    color=TEXT_DARK),
+        popup = Popup(title='已保存', title_font=_UI_FONT_NAME,
+                      content=Label(text='设置已保存，重启生效。',
+                                    font_name=_UI_FONT_NAME,
+                                    color=TEXT_WHITE,
+                                    halign='center'),
                       size_hint=(0.6, 0.35))
         Clock.schedule_once(lambda *_: popup.dismiss(), 1.2)
         popup.open()

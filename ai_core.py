@@ -11,9 +11,17 @@ import sys
 import re
 import json
 import math
+import ssl
 import time
 import threading
 import urllib.request
+
+try:
+    import certifi
+except Exception:
+    # Desktop/minimal environments may not have certifi installed.  In that
+    # case the request path below falls back to the platform SSL store.
+    certifi = None
 
 # --------------------------------------------------------------------------- #
 # 路径：Android 使用 python-for-android 提供的 app 私有目录；桌面测试时指向用户目录
@@ -672,6 +680,28 @@ def search_history(query, top_k=5):
 # --------------------------------------------------------------------------- #
 # API 流式调用（OpenAI 兼容，标准库 urllib）
 # --------------------------------------------------------------------------- #
+def _ssl_context():
+    """Build a verifying context that works with Android's bundled Python.
+
+    Android's system CA store is not consistently visible to the OpenSSL
+    runtime shipped inside python-for-android.  certifi supplies a portable
+    Mozilla CA bundle, while the default context remains the fallback for
+    desktop and platform-managed environments.
+    """
+    if certifi is not None:
+        try:
+            cafile = certifi.where()
+            if cafile and os.path.isfile(cafile):
+                return ssl.create_default_context(cafile=cafile)
+        except Exception as e:
+            print('内置 CA 证书加载失败，回退到系统证书:', e)
+    try:
+        return ssl.create_default_context()
+    except Exception as e:
+        print('系统 CA 证书加载失败，使用 urllib 默认校验:', e)
+        return None
+
+
 def _stream_once(messages, cfg, tools, on_token=None, on_reasoning=None):
     base = (cfg.get("base_url") or "").rstrip("/")
     url = base + "/chat/completions"
@@ -697,7 +727,12 @@ def _stream_once(messages, cfg, tools, on_token=None, on_reasoning=None):
     req.add_header("Authorization", "Bearer " + api_key)
     tool_calls = []
     last_usage = None
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    context = _ssl_context()
+    if context is None:
+        response = urllib.request.urlopen(req, timeout=120)
+    else:
+        response = urllib.request.urlopen(req, timeout=120, context=context)
+    with response as resp:
         for raw in resp:
             line = raw.decode("utf-8", errors="replace").strip()
             if not line or not line.startswith("data:"):

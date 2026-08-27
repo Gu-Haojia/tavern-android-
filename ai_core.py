@@ -1041,6 +1041,21 @@ class HistoryManager:
         self.messages.append({"role": "assistant", "content": content})
         save_page_file(self.max_page, self.messages)
 
+    def truncate_after_last_user(self):
+        """保留到最后一条用户消息（含），删除其后的所有消息（用于重新生成/编辑重发）。
+        返回被保留的那条用户消息文本；没有用户消息时返回 None 且不改动。"""
+        idx = None
+        for i in range(len(self.messages) - 1, -1, -1):
+            if self.messages[i].get("role") == "user":
+                idx = i
+                break
+        if idx is None:
+            return None
+        text = self.messages[idx].get("content") or ""
+        self.messages = self.messages[:idx + 1]
+        save_page_file(self.max_page, self.messages)
+        return text
+
     def rollover(self):
         """关闭当前页（生成该页摘要），开启新的一页。同步阻塞；须在后台线程调用。"""
         closed = self.max_page

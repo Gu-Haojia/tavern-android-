@@ -33,13 +33,38 @@ TEXT_WHITE = (1, 1, 1, 1)
 BG = (0.96, 0.97, 0.98, 1.0)
 
 
+class BubbleButton(Button):
+    """聊天气泡：长按（≥0.5s）触发菜单。不 disabled（disabled 会吞掉触摸事件）。"""
+
+    def __init__(self, **kw):
+        super().__init__(**kw)
+        self.long_press_cb = None
+        self._press_at = None
+        self.background_normal = ''
+        self.background_down = ''
+        self.background_disabled = ''
+
+    def on_touch_down(self, touch):
+        if self.collide_point(*touch.pos):
+            self._press_at = time.time()
+        return super().on_touch_down(touch)
+
+    def on_touch_up(self, touch):
+        if self.collide_point(*touch.pos) and self._press_at is not None:
+            dt = time.time() - self._press_at
+            self._press_at = None
+            if dt >= 0.5 and self.long_press_cb:
+                self.long_press_cb()
+                return True
+        return super().on_touch_up(touch)
+
+
 def _bubble(text, is_user):
-    """生成一条聊天气泡（Button 禁用态充当圆角气泡）。"""
-    btn = Button(
+    """生成一条聊天气泡（BubbleButton 充当圆角气泡，长按弹操作菜单）。"""
+    btn = BubbleButton(
         text=text,
         size_hint=(0.78, None),
         height=None,
-        disabled=True,
         halign='left' if not is_user else 'right',
         valign='middle',
         text_size=(None, None),
@@ -58,6 +83,7 @@ class ChatScreen(Screen):
         self.hm = None          # ai_core.HistoryManager
         self.busy = False
         self.cur_bubble = None  # 流式中正在更新的气泡
+        self._reasoning_parts = []  # 本回合思维链片段（工作线程收集，主线程展示）
         self.build_ui()
 
     # ---------- UI ----------
@@ -72,6 +98,10 @@ class ChatScreen(Screen):
                                  background_color=(0.75, 0.78, 0.82, 1), color=TEXT_DARK)
         self.tavern_btn.bind(on_release=lambda *_: self.toggle_tavern())
         top.add_widget(self.tavern_btn)
+        regen_btn = Button(text='🔄', size_hint_x=None, width=dp(44),
+                           background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
+        regen_btn.bind(on_release=lambda *_: self.regen())
+        top.add_widget(regen_btn)
         new_btn = Button(text='新对话', size_hint_x=None, width=dp(80),
                          background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
         new_btn.bind(on_release=lambda *_: self.new_chat())
@@ -121,9 +151,17 @@ class ChatScreen(Screen):
     # ---------- 气泡 ----------
     def add_bubble(self, text, is_user):
         b = _bubble(text, is_user)
+        b.long_press_cb = lambda: self.show_bubble_menu(b, is_user)
         self.msg_box.add_widget(b)
         self.scroll_to_bottom()
         return b
+
+    def rebuild_bubbles(self):
+        """清空并重画当前页全部气泡（编辑/删除/重新生成后调用）。"""
+        self.msg_box.clear_widgets()
+        self.choices_box.clear_widgets()
+        self.choices_box.height = 0
+        self.load_history()
 
     def scroll_to_bottom(self):
         Clock.schedule_once(lambda *_: self.scroll.scroll_y if hasattr(self.scroll, 'scroll_y')
@@ -152,22 +190,27 @@ class ChatScreen(Screen):
         self.input.disabled = not enabled
         self.input.opacity = 1.0 if enabled else 0.5
 
-    def _run(self, text):
+    def _run(self, text, append_user=True):
         try:
-            self.hm.append_user(text)
+            if append_user:
+                self.hm.append_user(text)
             if self.hm.cfg.get('tavern_mode'):
                 text = '> ' + text
             msgs = self.hm.build_context()
             self.cur_bubble = None
+            self._reasoning_parts = []
 
             def on_token(tok):
                 Clock.schedule_once(lambda *_: self.append_stream(tok), 0)
 
             def on_reasoning(r):
-                pass
+                if r:
+                    self._reasoning_parts.append(r)
 
             ai_text, reasoning, usage = ai_core.run_model_session(
                 msgs, self.hm.cfg, on_token=on_token, on_reasoning=on_reasoning)
+            if reasoning:
+                self._reasoning_parts.append(reasoning)
             # 流式结束后收尾
             Clock.schedule_once(lambda *_: self.on_finished(ai_text, usage), 0)
         except Exception as e:
@@ -190,6 +233,8 @@ class ChatScreen(Screen):
             self.add_bubble(ai_text or '(空回复)', False)
         self.cur_bubble = None
         self.hm.append_assistant(ai_text)
+        # 思维链简化展示：灰色小字追加在 AI 气泡下方（便于观察 AI 是否入戏）
+        self._render_reasoning()
         if usage:
             stats = ai_core.load_token_stats()
             for k in ('prompt_tokens', 'completion_tokens', 'total_tokens'):
@@ -202,6 +247,22 @@ class ChatScreen(Screen):
         # 分页：达到上限自动翻页（后台）
         if len([m for m in self.hm.current() if m.get('role')]) >= ai_core.PAGE_SIZE:
             threading.Thread(target=self._rollover_bg, daemon=True).start()
+
+    def _render_reasoning(self):
+        """把本回合思维链渲染成气泡下方的灰色小字（有才显示）。"""
+        parts = [p for p in self._reasoning_parts if (p or '').strip()]
+        self._reasoning_parts = []
+        if not parts:
+            return
+        rtext = '\n'.join(parts).strip()
+        if not rtext:
+            return
+        tip = Label(text='💭 ' + rtext, font_size=sp(11), color=(0.55, 0.57, 0.63, 1),
+                    halign='left', valign='top', size_hint=(0.78, None),
+                    text_size=(dp(280), None), padding=(dp(16), 0))
+        tip.bind(size=lambda w, _: setattr(w, 'height', w.text_size[1] + dp(8)))
+        self.msg_box.add_widget(tip)
+        self.scroll_to_bottom()
 
     def _rollover_bg(self):
         try:
@@ -242,6 +303,94 @@ class ChatScreen(Screen):
         self.choices_box.height = 0
         self.input.text = choice
         self.send()
+
+    # ---------- 气泡操作（长按菜单 / 重新生成 / 编辑 / 删除） ----------
+    def _find_msg_index(self, content, is_user):
+        """按内容从后往前定位消息索引（用于编辑/删除）。"""
+        role = 'user' if is_user else 'assistant'
+        for i in range(len(self.hm.messages) - 1, -1, -1):
+            m = self.hm.messages[i]
+            if m.get('role') == role and (m.get('content') or '') == content:
+                return i
+        return None
+
+    def regen(self):
+        """重新生成：删掉最后一条 AI 回复，重发最后一条用户消息。"""
+        if self.busy or not self.hm:
+            return
+        text = self.hm.truncate_after_last_user()
+        if text is None:
+            return
+        self.rebuild_bubbles()
+        self.busy = True
+        self.set_input_enabled(False)
+        threading.Thread(target=self._run, args=(text, False), daemon=True).start()
+
+    def show_bubble_menu(self, bubble, is_user):
+        if self.busy or not self.hm:
+            return
+        pop = Popup(title='气泡操作', size_hint=(0.8, None), height=dp(240))
+        box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
+        if is_user:
+            b_edit = Button(text='✏️ 编辑并重新生成',
+                            background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
+            b_edit.bind(on_release=lambda *_: (pop.dismiss(), self.edit_bubble(bubble)))
+            box.add_widget(b_edit)
+        else:
+            b_regen = Button(text='🔄 重新生成',
+                             background_color=(0.9, 0.92, 0.95, 1), color=TEXT_DARK)
+            b_regen.bind(on_release=lambda *_: (pop.dismiss(), self.regen()))
+            box.add_widget(b_regen)
+        b_del = Button(text='🗑 删除', background_color=(0.9, 0.6, 0.6, 1), color=TEXT_WHITE)
+        b_del.bind(on_release=lambda *_: (pop.dismiss(), self.delete_bubble(bubble, is_user)))
+        box.add_widget(b_del)
+        b_cancel = Button(text='取消', background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
+        b_cancel.bind(on_release=lambda *_: pop.dismiss())
+        box.add_widget(b_cancel)
+        pop.add_widget(box)
+        pop.open()
+
+    def edit_bubble(self, bubble):
+        """编辑用户消息：改内容 → 其后的对话作废 → 自动重新生成。"""
+        idx = self._find_msg_index(bubble.text, True)
+        if idx is None:
+            return
+        pop = Popup(title='编辑消息', size_hint=(0.9, 0.6))
+        box = BoxLayout(orientation='vertical', padding=dp(10), spacing=dp(8))
+        t_input = TextInput(text=bubble.text, multiline=True, foreground_color=TEXT_DARK)
+        box.add_widget(t_input)
+        btns = BoxLayout(size_hint_y=None, height=dp(48), spacing=dp(8))
+        ok = Button(text='保存并重新生成', background_color=BLUE, color=TEXT_WHITE)
+        cancel = Button(text='取消', background_color=(0.85, 0.87, 0.9, 1), color=TEXT_DARK)
+
+        def on_save(_):
+            new_text = t_input.text.strip()
+            if not new_text:
+                return
+            self.hm.messages[idx]['content'] = new_text
+            del self.hm.messages[idx + 1:]  # 旧内容衍生的后续对话作废
+            ai_core.save_page_file(self.hm.max_page, self.hm.messages)
+            pop.dismiss()
+            self.rebuild_bubbles()
+            self.busy = True
+            self.set_input_enabled(False)
+            threading.Thread(target=self._run, args=(new_text, False), daemon=True).start()
+
+        ok.bind(on_release=on_save)
+        cancel.bind(on_release=lambda *_: pop.dismiss())
+        btns.add_widget(ok)
+        btns.add_widget(cancel)
+        box.add_widget(btns)
+        pop.add_widget(box)
+        pop.open()
+
+    def delete_bubble(self, bubble, is_user):
+        idx = self._find_msg_index(bubble.text, is_user)
+        if idx is None:
+            return
+        self.hm.messages.pop(idx)
+        ai_core.save_page_file(self.hm.max_page, self.hm.messages)
+        self.rebuild_bubbles()
 
     # ---------- 新对话 ----------
     def new_chat(self):

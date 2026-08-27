@@ -499,32 +499,35 @@ class ChatScreen(Screen):
                         pos_hint={'x': 0, 'top': 1}, padding=(dp(18), dp(11)),
                         spacing=dp(9))
         top.add_widget(AvatarBadge(text='酒', fill_color=PRIMARY))
-        heading = BoxLayout(orientation='vertical', spacing=dp(0))
-        self.title_lbl = _label('酒馆', bold=True, font_size=sp(18),
+        heading = BoxLayout(orientation='vertical', spacing=dp(0), size_hint_x=1)
+        self.title_lbl = _label(_emoji_markup('酒馆'), markup=_EMOJI_MARKUP_AVAILABLE,
+                                bold=True, font_size=sp(18),
                                 size_hint_y=None, height=dp(28))
         self.subtitle_lbl = _label('准备好继续你的故事', color=MUTED, font_size=sp(11),
                                    size_hint_y=None, height=dp(19))
         heading.add_widget(self.title_lbl)
         heading.add_widget(self.subtitle_lbl)
         top.add_widget(heading)
+        actions = BoxLayout(size_hint_x=None, width=dp(180), spacing=dp(6))
         self.tavern_btn = ModernButton(
-            text='小说模式', size_hint_x=None, width=dp(82), height=dp(34),
+            text='小说模式', size_hint_x=None, width=dp(68), height=dp(34),
             background_color=PRIMARY_SOFT, color=PRIMARY_DARK, font_size=sp(11),
             button_radius=[dp(17)] * 4)
         self.tavern_btn.bind(on_release=lambda *_: self.toggle_tavern())
-        top.add_widget(self.tavern_btn)
-        regen_btn = ModernButton(text='重试', size_hint_x=None, width=dp(46),
+        actions.add_widget(self.tavern_btn)
+        regen_btn = ModernButton(text='重试', size_hint_x=None, width=dp(42),
                                  height=dp(34), background_color=FIELD_BG,
                                  color=TEXT_DARK, font_size=sp(11),
                                  button_radius=[dp(17)] * 4)
         regen_btn.bind(on_release=lambda *_: self.regen())
-        top.add_widget(regen_btn)
-        new_btn = ModernButton(text='新对话', size_hint_x=None, width=dp(56),
+        actions.add_widget(regen_btn)
+        new_btn = ModernButton(text='新对话', size_hint_x=None, width=dp(58),
                                height=dp(34), background_color=FIELD_BG,
                                color=TEXT_DARK, font_size=sp(11),
                                button_radius=[dp(17)] * 4)
         new_btn.bind(on_release=lambda *_: self.new_chat())
-        top.add_widget(new_btn)
+        actions.add_widget(new_btn)
+        top.add_widget(actions)
         root.add_widget(top)
         self.add_widget(root)
 
@@ -547,7 +550,7 @@ class ChatScreen(Screen):
         if not self.hm:
             return
         pet_name = (self.hm.cfg.get('pet_name') or '酒馆').strip()
-        self.title_lbl.text = pet_name
+        self.title_lbl.text = _emoji_markup(pet_name)
         self.subtitle_lbl.text = '小说模式已开启' if self.hm.cfg.get('tavern_mode') else '准备好继续你的故事'
 
     def _update_empty_state(self):

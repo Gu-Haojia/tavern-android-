@@ -23,6 +23,7 @@ requirements = python3,kivy
 # 固定到包含 Android wheel 安装修复的 p4a develop 提交，避免分支后续漂移。
 p4a.branch = develop
 p4a.commit = 9d5918bf752379f4520902524c15f794e45972b4
+p4a.local_recipes = ./p4a-recipes
 
 # Kivy Android 图形应用使用 SDL2 bootstrap。
 p4a.bootstrap = sdl2

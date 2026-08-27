@@ -52,8 +52,8 @@ jobs:
 
       - name: Build debug APK
         run: |
-          # GitHub runner 预装 NDK 27c，但官方验证组合用 NDK 29（buildozer.spec 已设 android.ndk=29）。
-          # 去掉预装 NDK 的环境变量，强制 buildozer 按 spec 自行下载 NDK 29。
+          # GitHub runner 预装 NDK 27c，但 p4a 官方推荐 NDK 28c（buildozer.spec 已设 android.ndk=28c）。
+          # 去掉预装 NDK 的环境变量，强制 buildozer 按 spec 自行下载 NDK 28c。
           unset ANDROID_NDK_HOME
           unset ANDROID_NDK_ROOT
           buildozer -v android debug

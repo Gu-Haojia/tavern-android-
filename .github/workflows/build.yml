@@ -4,10 +4,10 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: '3.10'
 
@@ -26,10 +26,12 @@ jobs:
             libxcursor-dev libxext-dev libxi-dev \
             build-essential
 
-      - name: Clean pip and install compatible versions
+      - name: Install pinned Python build tools
         run: |
-          python3 -m pip install --upgrade pip==26.1.2
-          python3 -m pip install --upgrade setuptools==69.0.2 wheel==0.42.0
+          python3 -m pip install --upgrade \
+            'pip==25.3' \
+            'setuptools==80.9.0' \
+            'wheel==0.45.1'
 
       - name: Install buildozer and cython with pinned versions
         run: |

@@ -15,22 +15,16 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,ttf,txt,json
 source.exclude_dirs = tests, bin, .git, .github, .buildozer
 
-# 依赖：ai_core 只用 Python 标准库，Kivy 提供 UI
-# ⚠️ buildozer requirements 格式严格：
-#   - 不要写 python3.12（不是 pip 包名，p4a 拉不到）
-#   - 不要写 >=3.0,<3.5 这类版本约束（buildozer 按逗号分割会错把 <3.5 当成独立包）
-#   - distro / charset_normalizer 是普通 pip 包（不是 p4a recipe），放 [app] requirements；
-#     p4a 会通过 pip 装上
-#   - Python 版本不是靠 bootstrap 名控制的（网上“sd12=Python 3.12”是误读）；
-#     避免 3.14 问题的关键是 p4a.branch = master（见下）
-requirements = python3,kivy,distro,charset_normalizer
+# ai_core 只使用 Python 标准库，UI 只依赖 Kivy。
+# 不要添加未使用的普通 pip 包，否则 p4a 会进入额外的
+# pure-Python 包安装阶段，容易受目标 Python 内置 pip 版本影响。
+requirements = python3,kivy
 
-# 强制 p4a 用 master 分支；buildozer 1.5.0 默认会拉 develop,
-# develop 要求 hostpython3 3.14,其内置 pip 内部模块不匹配,会报 BuildDependencyInstallError
+# 使用已发布的 p4a v2026.05.09，避免分支后续漂移。
 p4a.branch = master
+p4a.commit = 58d21141f17c889bf8585f5665921d72028f8831
 
-# p4a bootstrap：合法取值仅 sdl2 / service_only / webview / qt 等，没有 sd12。
-# sdl2 是安卓图形应用标准 bootstrap（Kivy 走 SDL2）。
+# Kivy Android 图形应用使用 SDL2 bootstrap。
 p4a.bootstrap = sdl2
 
 # 竖屏（手机聊天应用）
@@ -40,12 +34,6 @@ orientation = portrait
 # icon.filename = %(source.dir)s/icons/icon.png
 # presplash.filename = %(source.dir)s/icons/splash.png
 
-[buildozer]
-# 日志级别
-log_level = 2
-warn_on_root = 1
-
-[android]
 # 需要联网调 DeepSeek API
 android.permissions = INTERNET
 # 目标 API 34、最低 24（Android 7+）
@@ -56,3 +44,8 @@ android.archs = arm64-v8a
 android.accept_sdk_license = True
 # 打包为 debug 版（无需签名配置，适合自用）
 android.debug_artifact_name = tavernpet-debug
+
+[buildozer]
+# 日志级别
+log_level = 2
+warn_on_root = 1

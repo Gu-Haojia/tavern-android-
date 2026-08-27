@@ -266,7 +266,8 @@ def _bubble(text, is_user):
         widget.text_size = (max(dp(90), widget.width - dp(28)), None)
 
     btn.bind(width=update_bubble_width)
-    Clock.schedule_once(update_bubble_width, 0)
+    # Clock.schedule_once 只传入 dt；宽度绑定则传入 (widget, value)，两者分开适配。
+    Clock.schedule_once(lambda _dt: update_bubble_width(btn, _dt), 0)
 
     def update_bubble_height(widget, _):
         text_height = widget.texture_size[1] or 0

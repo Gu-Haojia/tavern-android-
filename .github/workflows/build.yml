@@ -6,9 +6,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install deps
-        run: sudo apt-get update -y && sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libffi-dev libssl-dev
-      - name: Upgrade pip, setuptools, and wheel
-        run: python3 -m pip install --upgrade pip setuptools wheel
+        run: sudo apt-get update -y && sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libtinfo5 cmake libff[...]
+      - name: Ensure pip < 24 and upgrade setuptools/wheel
+        run: python3 -m pip install --upgrade "pip<24" setuptools wheel
       - name: Install buildozer with compatible dependencies
         run: python3 -m pip install --upgrade "buildozer>=1.4.0" "cython>=0.29.0" "setuptools>=58.0"
       - name: Build APK
